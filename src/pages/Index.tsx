@@ -109,7 +109,7 @@ const Index = () => {
           <img
             src={heroImage}
             alt="O2 Guru Summit 2025"
-            className="w-full h-full object-cover object-center"
+            className="w-full h-full object-cover object-bottom"
           />
           <div className="absolute inset-0 flex items-center justify-center px-4 py-32">
             <div className="text-center text-white animate-fade-in">
