@@ -66,17 +66,17 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
     return Math.max(0, eventEndTime - currentTime);
   };
 
-  // Calculate time to next program
+  // Calculate time to next program (in seconds)
   const calculateTimeToNext = () => {
     const nextEvent = getNextEvent();
     if (!nextEvent) return 0;
 
     const now = new Date();
-    const currentTime = now.getHours() * 60 + now.getMinutes();
+    const currentTimeInSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
     const [eventHour, eventMinute] = nextEvent.time.split(':').map(Number);
-    const eventStartTime = eventHour * 60 + eventMinute;
+    const eventStartTimeInSeconds = eventHour * 3600 + eventMinute * 60;
 
-    return Math.max(0, eventStartTime - currentTime);
+    return Math.max(0, eventStartTimeInSeconds - currentTimeInSeconds);
   };
 
   // Timer countdown
@@ -205,7 +205,7 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                 <Clock className="h-4 w-4" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl sm:text-3xl font-bold mb-1">{formatTime(timeToNext * 60)}</div>
+                <div className="text-2xl sm:text-3xl font-bold mb-1">{formatTime(timeToNext)}</div>
                 {getNextEvent() ? (
                   <div className="space-y-1">
                     <p className="text-xs text-white/90 font-medium">
