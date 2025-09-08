@@ -350,12 +350,12 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                   <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {discountedPhones.map((phone) => (
                       <Card key={phone.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                        <div className="aspect-square relative bg-muted">
+                        <div className="aspect-[4/3] relative bg-muted">
                           {phone.phoneImage ? (
                             <img
                               src={phone.phoneImage}
                               alt={phone.phoneModel}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-contain"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
