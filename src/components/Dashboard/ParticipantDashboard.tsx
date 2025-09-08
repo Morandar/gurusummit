@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { BoothCodeModal } from '@/components/Modals/BoothCodeModal';
 import { ProfileEditModal } from '@/components/Profile/ProfileEditModal';
-import { Clock, MapPin, Trophy, Calendar, Smartphone, Lock, User } from 'lucide-react';
+import { Clock, MapPin, Trophy, Calendar, Smartphone, Lock, User, DollarSign } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 
 interface ParticipantDashboardProps {
@@ -17,7 +17,7 @@ interface ParticipantDashboardProps {
 }
 
 export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: ParticipantDashboardProps) => {
-  const { booths, program, users, visitBooth, isLoading } = useData();
+  const { booths, program, users, visitBooth, isLoading, discountedPhones } = useData();
   const [timeToNext, setTimeToNext] = useState(0);
   const [selectedBooth, setSelectedBooth] = useState<{ id: number; name: string } | null>(null);
   
@@ -208,10 +208,11 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
         </div>
 
         <Tabs defaultValue="booths" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 h-12">
-            <TabsTrigger value="booths" className="text-sm sm:text-base">Stánky</TabsTrigger>
-            <TabsTrigger value="program" className="text-sm sm:text-base">Program</TabsTrigger>
-          </TabsList>
+           <TabsList className="grid w-full grid-cols-3 h-12">
+             <TabsTrigger value="booths" className="text-sm sm:text-base">Stánky</TabsTrigger>
+             <TabsTrigger value="program" className="text-sm sm:text-base">Program</TabsTrigger>
+             <TabsTrigger value="phones" className="text-sm sm:text-base">Zlevněné telefony</TabsTrigger>
+           </TabsList>
 
           <TabsContent value="booths" className="space-y-4">
             <Card>
@@ -319,6 +320,91 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                     );
                   })}
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="phones" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <Smartphone className="h-5 w-5 text-primary" />
+                  Zlevněné telefony
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Speciální nabídka zlevněných telefonů pro účastníky summitu
+                </p>
+              </CardHeader>
+              <CardContent>
+                {discountedPhones.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Smartphone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                      Žádné zlevněné telefony
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      V současné době nejsou k dispozici žádné zlevněné telefony.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {discountedPhones.map((phone) => (
+                      <Card key={phone.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                        <div className="aspect-square relative bg-muted">
+                          {phone.phoneImage ? (
+                            <img
+                              src={phone.phoneImage}
+                              alt={phone.phoneModel}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Smartphone className="h-12 w-12 text-muted-foreground" />
+                            </div>
+                          )}
+                          {phone.manufacturerLogo && (
+                            <div className="absolute top-2 left-2 bg-white/90 rounded-full p-1">
+                              <img
+                                src={phone.manufacturerLogo}
+                                alt={phone.manufacturerName}
+                                className="w-8 h-8 object-contain"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <CardContent className="p-4">
+                          <div className="space-y-2">
+                            <div>
+                              <h3 className="font-semibold text-sm">{phone.phoneModel}</h3>
+                              <p className="text-xs text-muted-foreground">{phone.manufacturerName}</p>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm line-through text-muted-foreground">
+                                  {phone.originalPrice.toLocaleString()} Kč
+                                </span>
+                                <span className="text-lg font-bold text-green-600">
+                                  {phone.discountedPrice.toLocaleString()} Kč
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 text-green-600">
+                              <DollarSign className="h-4 w-4" />
+                              <span className="text-sm font-medium">
+                                Úspora {((phone.originalPrice - phone.discountedPrice) / phone.originalPrice * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                            {phone.description && (
+                              <p className="text-xs text-muted-foreground mt-2">
+                                {phone.description}
+                              </p>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

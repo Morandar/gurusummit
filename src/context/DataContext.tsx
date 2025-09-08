@@ -63,6 +63,17 @@ interface HomePageTexts {
   prizesDescription: string;
 }
 
+interface DiscountedPhone {
+  id: number;
+  manufacturerName: string;
+  phoneModel: string;
+  manufacturerLogo?: string;
+  phoneImage?: string;
+  originalPrice: number;
+  discountedPrice: number;
+  description?: string;
+}
+
 interface DataContextType {
   users: User[];
   booths: Booth[];
@@ -70,6 +81,7 @@ interface DataContextType {
   codeTimeSettings: CodeTimeSettings;
   homePageTexts: HomePageTexts;
   winners: Winner[];
+  discountedPhones: DiscountedPhone[];
   isLoading: boolean;
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   setBooths: React.Dispatch<React.SetStateAction<Booth[]>>;
@@ -77,6 +89,7 @@ interface DataContextType {
   setCodeTimeSettings: React.Dispatch<React.SetStateAction<CodeTimeSettings>>;
   setHomePageTexts: React.Dispatch<React.SetStateAction<HomePageTexts>>;
   setWinners: React.Dispatch<React.SetStateAction<Winner[]>>;
+  setDiscountedPhones: React.Dispatch<React.SetStateAction<DiscountedPhone[]>>;
   visitBooth: (userId: number, boothId: number) => Promise<void>;
   getUserProgress: (userId: number) => number;
   resetAllProgress: () => void;
@@ -101,6 +114,8 @@ const initialBooths: Booth[] = [];
 const initialProgram: ProgramEvent[] = [];
 
 const initialWinners: Winner[] = [];
+
+const initialDiscountedPhones: DiscountedPhone[] = [];
 
 const initialCodeTimeSettings: CodeTimeSettings = {
   startTime: '09:00',
@@ -184,6 +199,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [codeTimeSettings, setCodeTimeSettingsState] = useState<CodeTimeSettings>(initialCodeTimeSettings);
   const [homePageTexts, setHomePageTextsState] = useState<HomePageTexts>(initialHomePageTexts);
   const [winners, setWinnersState] = useState<Winner[]>([]);
+  const [discountedPhones, setDiscountedPhones] = useState<DiscountedPhone[]>(initialDiscountedPhones);
 
   // Registrace účastníka: hashování hesla a uložení do DB
   const registerParticipant = async (userData: Omit<User, 'id' | 'progress' | 'visits' | 'visitedBooths' | 'password_hash'> & { password: string }) => {
@@ -378,6 +394,25 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchDiscountedPhones = async () => {
+    const { data, error } = await supabase.from('discounted_phones').select('*').order('id');
+    if (!error && data) {
+      const mappedPhones = data.map((phone: any) => ({
+        id: phone.id,
+        manufacturerName: phone.manufacturer_name,
+        phoneModel: phone.phone_model,
+        manufacturerLogo: phone.manufacturer_logo,
+        phoneImage: phone.phone_image,
+        originalPrice: phone.original_price,
+        discountedPrice: phone.discounted_price,
+        description: phone.description
+      }));
+      setDiscountedPhones(mappedPhones);
+    } else if (error) {
+      console.error('Error fetching discounted phones:', error);
+    }
+  };
+
   const fetchSettings = async () => {
     try {
       // Fetch code time settings
@@ -423,6 +458,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         await fetchUsers(totalBooths); // Pass booth count to users
         await fetchProgram();
         await fetchWinners(); // Fetch winners from database
+        await fetchDiscountedPhones(); // Fetch discounted phones from database
         await fetchSettings(); // Fetch settings from database
         console.log('✅ DataContext: All data fetched successfully');
       } catch (error) {
@@ -684,6 +720,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       codeTimeSettings,
       homePageTexts,
       winners,
+      discountedPhones,
       isLoading,
       setUsers,
       setBooths,
@@ -691,6 +728,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       setCodeTimeSettings,
       setHomePageTexts,
       setWinners,
+      setDiscountedPhones,
       visitBooth,
       getUserProgress,
       resetAllProgress,

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, Users, Building, Calendar, BarChart3, Download, RotateCcw, Plus, Edit, Trash2, Trophy, User, Image, Eye } from 'lucide-react';
+import { LogOut, Users, Building, Calendar, BarChart3, Download, RotateCcw, Plus, Edit, Trash2, Trophy, User, Image, Eye, Smartphone } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,9 +22,9 @@ import { Textarea } from '@/components/ui/textarea';
 
 export const AdminDashboard = () => {
   const { logout } = useAuth();
-  const { 
-    users, booths, program, codeTimeSettings, homePageTexts, winners,
-    setUsers, setBooths, setProgram, setCodeTimeSettings, setHomePageTexts, 
+  const {
+    users, booths, program, codeTimeSettings, homePageTexts, winners, discountedPhones,
+    setUsers, setBooths, setProgram, setCodeTimeSettings, setHomePageTexts, setDiscountedPhones,
     resetAllProgress, removeUserProfileImage, addUserByAdmin
   } = useData();
   const isLoading = false; // Temporary fix for TS cache issue
@@ -41,11 +41,22 @@ export const AdminDashboard = () => {
   const [addBoothDialog, setAddBoothDialog] = useState(false);
   const [addEventDialog, setAddEventDialog] = useState(false);
   const [editEventDialog, setEditEventDialog] = useState({ open: false, event: null });
+  const [editPhoneDialog, setEditPhoneDialog] = useState({ open: false, phone: null });
+  const [addPhoneDialog, setAddPhoneDialog] = useState(false);
 
   // Form states
   const [userForm, setUserForm] = useState({ firstName: '', lastName: '', personalNumber: '', position: '' });
   const [boothForm, setBoothForm] = useState({ name: '', code: '', login: '', category: '', password: '', logo: '' });
   const [eventForm, setEventForm] = useState({ time: '', event: '', duration: 30 });
+  const [phoneForm, setPhoneForm] = useState({
+    manufacturerName: '',
+    phoneModel: '',
+    manufacturerLogo: '',
+    phoneImage: '',
+    originalPrice: 0,
+    discountedPrice: 0,
+    description: ''
+  });
   
   // Local draft state for homepage texts
   const [homePageTextsDraft, setHomePageTextsDraft] = useState(homePageTexts);
@@ -210,6 +221,19 @@ export const AdminDashboard = () => {
     setEditUserDialog({ open: true, user });
   };
 
+  const handleEditPhone = (phone: any) => {
+    setPhoneForm({
+      manufacturerName: phone.manufacturerName,
+      phoneModel: phone.phoneModel,
+      manufacturerLogo: phone.manufacturerLogo || '',
+      phoneImage: phone.phoneImage || '',
+      originalPrice: phone.originalPrice,
+      discountedPrice: phone.discountedPrice,
+      description: phone.description || ''
+    });
+    setEditPhoneDialog({ open: true, phone });
+  };
+
   const handleEditBooth = (booth: any) => {
     setBoothForm({ 
       name: booth.name, 
@@ -347,8 +371,8 @@ export const AdminDashboard = () => {
         }
 
         // Update local state only if database update succeeded
-        setProgram(prev => prev.map(item => 
-          item.id === editEventDialog.event.id 
+        setProgram(prev => prev.map(item =>
+          item.id === editEventDialog.event.id
             ? { ...item, ...eventForm }
             : item
         ));
@@ -356,43 +380,153 @@ export const AdminDashboard = () => {
       } else {
         // Generate new ID for the event (since program table doesn't have auto-increment)
         const newId = program.length > 0 ? Math.max(...program.map(p => p.id)) + 1 : 1;
-        
+
         // Create new event in Supabase with explicit ID
         const { data, error } = await supabase
           .from('program')
-          .insert([{ 
+          .insert([{
             id: newId,
             time: eventForm.time,
             event: eventForm.event,
-            duration: eventForm.duration 
+            duration: eventForm.duration
           }])
           .select();
-        
+
         if (error) {
           toast({ title: 'Chyba při vytváření události', description: error.message });
           return;
         }
-        
+
         // Update local state with new event
         if (data && data[0]) {
-          setProgram(prev => [...prev, { 
+          setProgram(prev => [...prev, {
             id: data[0].id,
             time: data[0].time,
             event: data[0].event,
-            duration: data[0].duration 
-          }].sort((a, b) => 
+            duration: data[0].duration
+          }].sort((a, b) =>
             a.time.localeCompare(b.time)
           ));
           toast({ title: 'Událost přidána', description: 'Nová událost byla vytvořena' });
         }
       }
-      
+
       setEditEventDialog({ open: false, event: null });
       setAddEventDialog(false);
       setEventForm({ time: '', event: '', duration: 30 });
     } catch (error) {
       console.error('Save event error:', error);
       toast({ title: 'Chyba při ukládání události', description: 'Nastala neočekávaná chyba' });
+    }
+  };
+
+  const handleSavePhone = async () => {
+    try {
+      if (editPhoneDialog.phone) {
+        // Update existing phone in Supabase
+        const { error } = await supabase
+          .from('discounted_phones')
+          .update({
+            manufacturer_name: phoneForm.manufacturerName,
+            phone_model: phoneForm.phoneModel,
+            manufacturer_logo: phoneForm.manufacturerLogo || null,
+            phone_image: phoneForm.phoneImage || null,
+            original_price: phoneForm.originalPrice,
+            discounted_price: phoneForm.discountedPrice,
+            description: phoneForm.description || null
+          })
+          .eq('id', editPhoneDialog.phone.id);
+
+        if (error) {
+          toast({ title: 'Chyba při úpravě telefonu', description: error.message });
+          return;
+        }
+
+        // Update local state only if database update succeeded
+        setDiscountedPhones(prev => prev.map(phone =>
+          phone.id === editPhoneDialog.phone.id
+            ? { ...phone, ...phoneForm }
+            : phone
+        ));
+        toast({ title: 'Telefon upraven', description: 'Změny byly uloženy' });
+      } else {
+        // Create new phone
+        const { data, error } = await supabase
+          .from('discounted_phones')
+          .insert([{
+            manufacturer_name: phoneForm.manufacturerName,
+            phone_model: phoneForm.phoneModel,
+            manufacturer_logo: phoneForm.manufacturerLogo || null,
+            phone_image: phoneForm.phoneImage || null,
+            original_price: phoneForm.originalPrice,
+            discounted_price: phoneForm.discountedPrice,
+            description: phoneForm.description || null
+          }])
+          .select();
+
+        if (error) {
+          toast({ title: 'Chyba při vytváření telefonu', description: error.message });
+          return;
+        }
+
+        // Update local state with new phone
+        if (data && data[0]) {
+          const newPhone = {
+            id: data[0].id,
+            manufacturerName: data[0].manufacturer_name,
+            phoneModel: data[0].phone_model,
+            manufacturerLogo: data[0].manufacturer_logo,
+            phoneImage: data[0].phone_image,
+            originalPrice: data[0].original_price,
+            discountedPrice: data[0].discounted_price,
+            description: data[0].description
+          };
+          setDiscountedPhones(prev => [...prev, newPhone]);
+          toast({ title: 'Telefon přidán', description: 'Nový telefon byl vytvořen' });
+        }
+      }
+
+      setEditPhoneDialog({ open: false, phone: null });
+      setAddPhoneDialog(false);
+      setPhoneForm({
+        manufacturerName: '',
+        phoneModel: '',
+        manufacturerLogo: '',
+        phoneImage: '',
+        originalPrice: 0,
+        discountedPrice: 0,
+        description: ''
+      });
+    } catch (error) {
+      console.error('Save phone error:', error);
+      toast({ title: 'Chyba při ukládání telefonu', description: 'Nastala neočekávaná chyba' });
+    }
+  };
+
+  const handleDeletePhone = async (phoneId: number) => {
+    try {
+      // Delete from Supabase first
+      const { error } = await supabase.from('discounted_phones').delete().eq('id', phoneId);
+      if (error) {
+        toast({
+          title: 'Chyba při mazání telefonu',
+          description: error.message,
+        });
+        return;
+      }
+
+      // Update local state only if database delete succeeded
+      setDiscountedPhones(prev => prev.filter(phone => phone.id !== phoneId));
+      toast({
+        title: 'Telefon smazán',
+        description: 'Telefon byl úspěšně odstraněn',
+      });
+    } catch (error) {
+      console.error('Delete phone error:', error);
+      toast({
+        title: 'Chyba při mazání telefonu',
+        description: 'Nastala neočekávaná chyba',
+      });
     }
   };
 
@@ -540,13 +674,14 @@ export const AdminDashboard = () => {
         </div>
 
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="users">Účastníci</TabsTrigger>
-            <TabsTrigger value="booths">Stánky</TabsTrigger>
-            <TabsTrigger value="program">Program</TabsTrigger>
-            <TabsTrigger value="settings">Nastavení</TabsTrigger>
-            <TabsTrigger value="actions">Akce</TabsTrigger>
-          </TabsList>
+           <TabsList className="grid w-full grid-cols-6">
+             <TabsTrigger value="users">Účastníci</TabsTrigger>
+             <TabsTrigger value="booths">Stánky</TabsTrigger>
+             <TabsTrigger value="program">Program</TabsTrigger>
+             <TabsTrigger value="phones">Zlevněné telefony</TabsTrigger>
+             <TabsTrigger value="settings">Nastavení</TabsTrigger>
+             <TabsTrigger value="actions">Akce</TabsTrigger>
+           </TabsList>
 
           {/* Users Tab */}
           <TabsContent value="users" className="space-y-4">
@@ -860,6 +995,109 @@ export const AdminDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Phones Tab */}
+          <TabsContent value="phones" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Správa zlevněných telefonů</h3>
+              <Button onClick={() => setAddPhoneDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Přidat telefon
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {discountedPhones.map((phone) => (
+                <Card key={phone.id}>
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      {phone.phoneImage ? (
+                        <img
+                          src={phone.phoneImage}
+                          alt={phone.phoneModel}
+                          className="w-12 h-12 object-contain rounded"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
+                          <Smartphone className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div>
+                        <CardTitle className="text-lg">{phone.phoneModel}</CardTitle>
+                        <CardDescription>{phone.manufacturerName}</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Původní cena:</span>
+                        <span className="font-medium line-through">{phone.originalPrice.toLocaleString()} Kč</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Zlevněná cena:</span>
+                        <span className="font-bold text-green-600">{phone.discountedPrice.toLocaleString()} Kč</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Úspora:</span>
+                        <Badge variant="secondary">
+                          {((phone.originalPrice - phone.discountedPrice) / phone.originalPrice * 100).toFixed(0)}%
+                        </Badge>
+                      </div>
+                      {phone.description && (
+                        <div className="pt-2">
+                          <span className="text-sm text-muted-foreground">Popis:</span>
+                          <p className="text-sm mt-1">{phone.description}</p>
+                        </div>
+                      )}
+                      <div className="pt-2 space-x-2">
+                        <Button variant="outline" size="sm" onClick={() => handleEditPhone(phone)}>
+                          <Edit className="h-4 w-4 mr-1" />
+                          Upravit
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm">
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Smazat
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Smazat telefon?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Opravdu chcete smazat telefon {phone.phoneModel}? Tato akce je nevratná.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Zrušit</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeletePhone(phone.id)}>
+                                Smazat
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {discountedPhones.length === 0 && (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <Smartphone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                    Žádné zlevněné telefony
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Začněte přidáním prvního zlevněného telefonu.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Settings Tab */}
@@ -1443,17 +1681,189 @@ export const AdminDashboard = () => {
           </DialogContent>
         </Dialog>
       </div>
-      
-      <LotteryWheel 
-        isOpen={isLotteryOpen} 
-        onClose={() => setIsLotteryOpen(false)} 
+
+      {/* Edit Phone Dialog */}
+      <Dialog open={editPhoneDialog.open} onOpenChange={(open) => setEditPhoneDialog({ open, phone: null })}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Upravit telefon</DialogTitle>
+            <DialogDescription>Změňte údaje zlevněného telefonu</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="phone-manufacturer" className="text-right">Výrobce</Label>
+              <Input
+                id="phone-manufacturer"
+                value={phoneForm.manufacturerName}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, manufacturerName: e.target.value }))}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="phone-model" className="text-right">Model</Label>
+              <Input
+                id="phone-model"
+                value={phoneForm.phoneModel}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, phoneModel: e.target.value }))}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="phone-logo" className="text-right">Logo výrobce</Label>
+              <Input
+                id="phone-logo"
+                value={phoneForm.manufacturerLogo}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, manufacturerLogo: e.target.value }))}
+                className="col-span-3"
+                placeholder="URL obrázku loga"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="phone-image" className="text-right">Obrázek telefonu</Label>
+              <Input
+                id="phone-image"
+                value={phoneForm.phoneImage}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, phoneImage: e.target.value }))}
+                className="col-span-3"
+                placeholder="URL obrázku telefonu"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="original-price" className="text-right">Původní cena (Kč)</Label>
+              <Input
+                id="original-price"
+                type="number"
+                value={phoneForm.originalPrice}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, originalPrice: parseInt(e.target.value) || 0 }))}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="discounted-price" className="text-right">Zlevněná cena (Kč)</Label>
+              <Input
+                id="discounted-price"
+                type="number"
+                value={phoneForm.discountedPrice}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, discountedPrice: parseInt(e.target.value) || 0 }))}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="phone-description" className="text-right">Popis</Label>
+              <Textarea
+                id="phone-description"
+                value={phoneForm.description}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, description: e.target.value }))}
+                className="col-span-3"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditPhoneDialog({ open: false, phone: null })}>
+              Zrušit
+            </Button>
+            <Button onClick={handleSavePhone}>Uložit změny</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Phone Dialog */}
+      <Dialog open={addPhoneDialog} onOpenChange={setAddPhoneDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Přidat zlevněný telefon</DialogTitle>
+            <DialogDescription>Vytvořte nový zlevněný telefon</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="add-phone-manufacturer" className="text-right">Výrobce</Label>
+              <Input
+                id="add-phone-manufacturer"
+                value={phoneForm.manufacturerName}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, manufacturerName: e.target.value }))}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="add-phone-model" className="text-right">Model</Label>
+              <Input
+                id="add-phone-model"
+                value={phoneForm.phoneModel}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, phoneModel: e.target.value }))}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="add-phone-logo" className="text-right">Logo výrobce</Label>
+              <Input
+                id="add-phone-logo"
+                value={phoneForm.manufacturerLogo}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, manufacturerLogo: e.target.value }))}
+                className="col-span-3"
+                placeholder="URL obrázku loga"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="add-phone-image" className="text-right">Obrázek telefonu</Label>
+              <Input
+                id="add-phone-image"
+                value={phoneForm.phoneImage}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, phoneImage: e.target.value }))}
+                className="col-span-3"
+                placeholder="URL obrázku telefonu"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="add-original-price" className="text-right">Původní cena (Kč)</Label>
+              <Input
+                id="add-original-price"
+                type="number"
+                value={phoneForm.originalPrice}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, originalPrice: parseInt(e.target.value) || 0 }))}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="add-discounted-price" className="text-right">Zlevněná cena (Kč)</Label>
+              <Input
+                id="add-discounted-price"
+                type="number"
+                value={phoneForm.discountedPrice}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, discountedPrice: parseInt(e.target.value) || 0 }))}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="add-phone-description" className="text-right">Popis</Label>
+              <Textarea
+                id="add-phone-description"
+                value={phoneForm.description}
+                onChange={(e) => setPhoneForm(prev => ({ ...prev, description: e.target.value }))}
+                className="col-span-3"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddPhoneDialog(false)}>
+              Zrušit
+            </Button>
+            <Button onClick={handleSavePhone}>Přidat telefon</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <LotteryWheel
+        isOpen={isLotteryOpen}
+        onClose={() => setIsLotteryOpen(false)}
       />
-      
-      <WinnersModal 
-        isOpen={isWinnersOpen} 
-        onClose={() => setIsWinnersOpen(false)} 
+
+      <WinnersModal
+        isOpen={isWinnersOpen}
+        onClose={() => setIsWinnersOpen(false)}
       />
-      
+
       {imageUploadModal && (
         <ImageUploadModal
           isOpen={imageUploadModal.open}

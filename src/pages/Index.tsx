@@ -104,22 +104,34 @@ const Index = () => {
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-subtle">
-        {/* Hero Section */}
-        <div className="relative h-96 overflow-hidden">
+        {/* Hero Section - Mobile */}
+        <div className="relative overflow-hidden md:hidden h-96">
           <img
             src={heroImage}
             alt="O2 Guru Summit 2025"
             className="w-full h-full object-cover object-bottom"
           />
-          <div className="absolute inset-0 flex items-center justify-center px-4 py-32">
+          <div className="absolute inset-0 flex items-center justify-center px-4 py-24">
             <div className="text-center text-white animate-fade-in">
-              <h1 className="text-5xl font-bold mb-4">{homePageTexts.title}</h1>
-              <p className="text-xl opacity-90">
-                {homePageTexts.subtitle}
-              </p>
-              <p className="text-lg opacity-75 mt-2">
-                {homePageTexts.description}
-              </p>
+              <h1 className="text-4xl font-bold mb-3">{homePageTexts.title}</h1>
+              <p className="text-lg opacity-90">{homePageTexts.subtitle}</p>
+              <p className="text-base opacity-75 mt-2">{homePageTexts.description}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Hero Section - Desktop */}
+        <div className="relative overflow-hidden hidden md:block h-[70vh]">
+          <img
+            src={heroImage}
+            alt="O2 Guru Summit 2025"
+            className="w-full h-full object-cover object-[50%_100%]"
+          />
+          <div className="absolute inset-0 flex items-center justify-center px-6">
+            <div className="text-center text-white animate-fade-in">
+              <h1 className="text-5xl lg:text-6xl font-bold mb-4">{homePageTexts.title}</h1>
+              <p className="text-xl opacity-90">{homePageTexts.subtitle}</p>
+              <p className="text-lg opacity-75 mt-2">{homePageTexts.description}</p>
             </div>
           </div>
         </div>
