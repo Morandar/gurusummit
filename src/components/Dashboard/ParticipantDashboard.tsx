@@ -205,7 +205,7 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                 <Clock className="h-4 w-4" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl sm:text-3xl font-bold mb-1">{formatTime(timeToNext)}</div>
+                <div className="text-2xl sm:text-3xl font-bold mb-1">{formatTime(timeToNext * 60)}</div>
                 {getNextEvent() ? (
                   <div className="space-y-1">
                     <p className="text-xs text-white/90 font-medium">
