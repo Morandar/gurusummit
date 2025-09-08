@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { BoothCodeModal } from '@/components/Modals/BoothCodeModal';
 import { ProfileEditModal } from '@/components/Profile/ProfileEditModal';
-import { Clock, MapPin, Trophy, Calendar, Smartphone, Lock, User, DollarSign } from 'lucide-react';
+import { Clock, MapPin, Trophy, Calendar, Smartphone, Lock, User, DollarSign, Star, Award } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 
 interface ParticipantDashboardProps {
@@ -240,19 +240,39 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
             </CardContent>
           </Card>
 
-          {/* Points Card */}
-          <Card>
+          {/* Lottery Status Card */}
+          <Card className={progress === 100 ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200' : ''}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Získané body
+                {progress === 100 ? 'Slosování o ceny' : 'Status slosování'}
               </CardTitle>
-              <MapPin className="h-4 w-4 text-primary" />
+              {progress === 100 ? (
+                <Award className="h-4 w-4 text-yellow-600" />
+              ) : (
+                <Trophy className="h-4 w-4 text-muted-foreground" />
+              )}
             </CardHeader>
             <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{visitedBooths.length * 10}</div>
-              <p className="text-xs text-muted-foreground">
-                10 bodů za stánek
-              </p>
+              {progress === 100 ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Star className="h-5 w-5 text-yellow-500 fill-current" />
+                    <span className="text-lg font-bold text-yellow-700">Jsem ve slosování!</span>
+                  </div>
+                  <p className="text-xs text-yellow-600 font-medium">
+                    Gratulujeme! Dokončil jsi všechny stánky.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="text-xl sm:text-2xl font-bold text-muted-foreground">
+                    Nejsem ve slosování
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Dokonči všechny stánky pro účast v losování
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
