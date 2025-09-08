@@ -197,74 +197,28 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
           <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-6 sm:mb-8">
             {/* Program Status Card */}
-            <Card className="col-span-1 sm:col-span-2 lg:col-span-1 overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <Card className="bg-gradient-primary text-white col-span-1 sm:col-span-2 lg:col-span-1">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Aktuální program
+                  Do dalšího programu
                 </CardTitle>
-                <Clock className="h-4 w-4 text-primary" />
+                <Clock className="h-4 w-4" />
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Current Event Section */}
-                {getCurrentEvent() ? (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-xs font-medium text-green-700 uppercase tracking-wide">
-                        Probíhá právě teď
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-semibold text-sm text-green-900">
-                        {getCurrentEvent()?.event}
-                      </h4>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-green-700">
-                          {getCurrentEvent()?.time} – {calculateEventEndTime(getCurrentEvent()!)}
-                        </span>
-                        <span className="font-medium text-green-800">
-                          končí za {formatTime(timeRemaining * 60)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                      <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-                        Žádný program
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      V současné době neprobíhá žádný program
+              <CardContent>
+                <div className="text-2xl sm:text-3xl font-bold mb-1">{formatTime(timeToNext)}</div>
+                {getNextEvent() ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-white/90 font-medium">
+                      {getNextEvent()?.event}
+                    </p>
+                    <p className="text-xs text-white/80">
+                      začíná v {getNextEvent()?.time}
                     </p>
                   </div>
-                )}
-
-                {/* Next Event Section */}
-                {getNextEvent() && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span className="text-xs font-medium text-blue-700 uppercase tracking-wide">
-                        Následuje
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-semibold text-sm text-blue-900">
-                        {getNextEvent()?.event}
-                      </h4>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-blue-700">
-                          Start: {getNextEvent()?.time}
-                        </span>
-                        <span className="font-medium text-blue-800">
-                          za {formatTimeHours(timeToNext)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                ) : (
+                  <p className="text-xs text-white/80">
+                    Žádné další události
+                  </p>
                 )}
               </CardContent>
             </Card>
