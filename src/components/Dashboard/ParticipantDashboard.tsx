@@ -19,6 +19,7 @@ interface ParticipantDashboardProps {
 export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: ParticipantDashboardProps) => {
   const { booths, program, users, visitBooth, isLoading, discountedPhones } = useData();
   const [timeToNext, setTimeToNext] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(0);
   const [selectedBooth, setSelectedBooth] = useState<{ id: number; name: string } | null>(null);
   
   // Get current user data from global state
@@ -26,49 +27,70 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
   const visitedBooths = currentUser?.visitedBooths || [];
   const progress = booths.length > 0 ? (visitedBooths.length / booths.length) * 100 : 0;
 
+  // Get current program event (what's happening now)
+  const getCurrentEvent = () => {
+    const now = new Date();
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+
+    return program.find(event => {
+      const [eventHour, eventMinute] = event.time.split(':').map(Number);
+      const eventStartTime = eventHour * 60 + eventMinute;
+      const eventEndTime = eventStartTime + event.duration;
+      return currentTime >= eventStartTime && currentTime < eventEndTime;
+    });
+  };
+
   // Get next program event
   const getNextEvent = () => {
     const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentSecond = now.getSeconds();
-    const currentTimeInSeconds = currentHour * 3600 + currentMinute * 60 + currentSecond;
-    
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+
     return program.find(event => {
       const [eventHour, eventMinute] = event.time.split(':').map(Number);
-      const eventTimeInSeconds = eventHour * 3600 + eventMinute * 60;
-      return eventTimeInSeconds > currentTimeInSeconds;
+      const eventStartTime = eventHour * 60 + eventMinute;
+      return eventStartTime > currentTime;
     });
+  };
+
+  // Calculate time remaining for current event
+  const calculateTimeRemaining = () => {
+    const currentEvent = getCurrentEvent();
+    if (!currentEvent) return 0;
+
+    const now = new Date();
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+    const [eventHour, eventMinute] = currentEvent.time.split(':').map(Number);
+    const eventStartTime = eventHour * 60 + eventMinute;
+    const eventEndTime = eventStartTime + currentEvent.duration;
+
+    return Math.max(0, eventEndTime - currentTime);
   };
 
   // Calculate time to next program
   const calculateTimeToNext = () => {
+    const nextEvent = getNextEvent();
+    if (!nextEvent) return 0;
+
     const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentSecond = now.getSeconds();
-    const currentTimeInSeconds = currentHour * 3600 + currentMinute * 60 + currentSecond;
-    
-    const upcomingEvent = getNextEvent();
-    
-    if (upcomingEvent) {
-      const [eventHour, eventMinute] = upcomingEvent.time.split(':').map(Number);
-      const eventTimeInSeconds = eventHour * 3600 + eventMinute * 60;
-      return eventTimeInSeconds - currentTimeInSeconds;
-    }
-    
-    return 0;
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+    const [eventHour, eventMinute] = nextEvent.time.split(':').map(Number);
+    const eventStartTime = eventHour * 60 + eventMinute;
+
+    return Math.max(0, eventStartTime - currentTime);
   };
 
   // Timer countdown
   useEffect(() => {
     const timer = setInterval(() => {
       const remaining = calculateTimeToNext();
+      const remainingCurrent = calculateTimeRemaining();
       setTimeToNext(remaining);
+      setTimeRemaining(remainingCurrent);
     }, 1000);
 
     // Initialize with correct time immediately
     setTimeToNext(calculateTimeToNext());
+    setTimeRemaining(calculateTimeRemaining());
 
     return () => clearInterval(timer);
   }, [program]);
@@ -77,6 +99,23 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const formatTimeHours = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
+  };
+
+  const calculateEventEndTime = (event: any) => {
+    const [startHour, startMinute] = event.time.split(':').map(Number);
+    const endMinute = startMinute + event.duration;
+    const endHour = startHour + Math.floor(endMinute / 60);
+    const finalMinute = endMinute % 60;
+    return `${endHour.toString().padStart(2, '0')}:${finalMinute.toString().padStart(2, '0')}`;
   };
 
   const handleBoothVisit = (boothId: number, boothName: string) => {
@@ -157,19 +196,76 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
           <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-6 sm:mb-8">
-            {/* Timer Card */}
-            <Card className="bg-gradient-primary text-white col-span-1 sm:col-span-2 lg:col-span-1">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            {/* Program Status Card */}
+            <Card className="col-span-1 sm:col-span-2 lg:col-span-1 overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                 <CardTitle className="text-sm font-medium">
-                  Do dalšího programu
+                  Aktuální program
                 </CardTitle>
-                <Clock className="h-4 w-4" />
+                <Clock className="h-4 w-4 text-primary" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl sm:text-3xl font-bold">{formatTime(timeToNext)}</div>
-                <p className="text-xs text-white/80">
-                  {getNextEvent() ? `${getNextEvent()?.event} začíná v ${getNextEvent()?.time}` : 'Žádné další události'}
-                </p>
+              <CardContent className="space-y-4">
+                {/* Current Event Section */}
+                {getCurrentEvent() ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-medium text-green-700 uppercase tracking-wide">
+                        Probíhá právě teď
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-semibold text-sm text-green-900">
+                        {getCurrentEvent()?.event}
+                      </h4>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-green-700">
+                          {getCurrentEvent()?.time} – {calculateEventEndTime(getCurrentEvent()!)}
+                        </span>
+                        <span className="font-medium text-green-800">
+                          končí za {formatTime(timeRemaining * 60)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                      <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                        Žádný program
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      V současné době neprobíhá žádný program
+                    </p>
+                  </div>
+                )}
+
+                {/* Next Event Section */}
+                {getNextEvent() && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="text-xs font-medium text-blue-700 uppercase tracking-wide">
+                        Následuje
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-semibold text-sm text-blue-900">
+                        {getNextEvent()?.event}
+                      </h4>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-blue-700">
+                          Start: {getNextEvent()?.time}
+                        </span>
+                        <span className="font-medium text-blue-800">
+                          za {formatTimeHours(timeToNext)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
