@@ -1375,42 +1375,6 @@ export const AdminDashboard = () => {
                     </div>
                   )}
 
-                  {/* Sample banner items for demonstration */}
-                  <div className="flex items-center justify-between p-4 border rounded-lg opacity-60">
-                    <div className="flex-1">
-                      <div className="font-medium">Workshop začíná za 15 minut!</div>
-                      <div className="text-sm text-muted-foreground">Cílová skupina: Účastníci</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch disabled />
-                      <Button variant="outline" size="sm" disabled>
-                        <Edit className="h-4 w-4 mr-1" />
-                        Upravit
-                      </Button>
-                      <Button variant="destructive" size="sm" disabled>
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Smazat
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border rounded-lg opacity-60">
-                    <div className="flex-1">
-                      <div className="font-medium">Připravte se na losování cen!</div>
-                      <div className="text-sm text-muted-foreground">Cílová skupina: Stánkaři</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch disabled />
-                      <Button variant="outline" size="sm" disabled>
-                        <Edit className="h-4 w-4 mr-1" />
-                        Upravit
-                      </Button>
-                      <Button variant="destructive" size="sm" disabled>
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Smazat
-                      </Button>
-                    </div>
-                  </div>
                 </div>
 
                 {(!banner) && (
