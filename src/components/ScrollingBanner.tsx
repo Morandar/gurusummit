@@ -8,11 +8,12 @@ interface ScrollingBannerProps {
 
 export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
   const [scrollPosition, setScrollPosition] = useState(100);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const { user } = useAuth();
 
-  // Determine which banner to show based on user type
-  const getAppropriateBanner = (): Banner | null => {
-    if (!banners || banners.length === 0) return null;
+  // Determine which banners to show based on user type
+  const getAppropriateBanners = (): Banner[] => {
+    if (!banners || banners.length === 0) return [];
 
     // Determine user type and map to banner audience
     const userType = user?.type || 'participant'; // Default to participant if no user
@@ -33,48 +34,46 @@ export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
         bannerAudience = 'participants';
     }
 
-    console.log('🎬 ScrollingBanner: Determining banner for user type:', userType, '-> banner audience:', bannerAudience);
+    console.log('🎬 ScrollingBanner: Determining banners for user type:', userType, '-> banner audience:', bannerAudience);
 
-    // Priority order: specific user type first, then 'all'
-    const userTypeBanner = banners.find(banner =>
-      banner.targetAudience === bannerAudience && banner.isActive
+    // Get all banners for this user type
+    const userTypeBanners = banners.filter(banner =>
+      (banner.targetAudience === bannerAudience || banner.targetAudience === 'all') && banner.isActive
     );
 
-    if (userTypeBanner) {
-      console.log('🎬 ScrollingBanner: Found specific banner for user type:', userType);
-      return userTypeBanner;
-    }
-
-    // Fallback to 'all' audience banner
-    const allAudienceBanner = banners.find(banner =>
-      banner.targetAudience === 'all' && banner.isActive
-    );
-
-    if (allAudienceBanner) {
-      console.log('🎬 ScrollingBanner: Using "all" audience banner');
-      return allAudienceBanner;
-    }
-
-    console.log('🎬 ScrollingBanner: No appropriate banner found');
-    return null;
+    console.log('🎬 ScrollingBanner: Found', userTypeBanners.length, 'banners for user type:', userType);
+    return userTypeBanners;
   };
 
-  const banner = getAppropriateBanner();
+  const appropriateBanners = getAppropriateBanners();
+  const currentBanner = appropriateBanners[currentBannerIndex];
 
-  console.log('🎬 ScrollingBanner: Component rendered with banners:', banners.length, 'total, selected banner:', banner ? {
-    id: banner.id,
-    text: banner.text.substring(0, 30) + (banner.text.length > 30 ? '...' : ''),
-    isActive: banner.isActive,
-    targetAudience: banner.targetAudience
+  console.log('🎬 ScrollingBanner: Component rendered with banners:', banners.length, 'total, appropriate banners:', appropriateBanners.length, 'current banner:', currentBanner ? {
+    id: currentBanner.id,
+    text: currentBanner.text.substring(0, 30) + (currentBanner.text.length > 30 ? '...' : ''),
+    isActive: currentBanner.isActive,
+    targetAudience: currentBanner.targetAudience
   } : 'null');
 
+  // Rotate through banners every 8 seconds
   useEffect(() => {
-    if (!banner?.text) {
+    if (appropriateBanners.length <= 1) return;
+
+    const rotationInterval = setInterval(() => {
+      setCurrentBannerIndex(prev => (prev + 1) % appropriateBanners.length);
+      setScrollPosition(100); // Reset scroll position when changing banner
+    }, 8000); // Change banner every 8 seconds
+
+    return () => clearInterval(rotationInterval);
+  }, [appropriateBanners.length]);
+
+  useEffect(() => {
+    if (!currentBanner?.text) {
       console.log('🎬 ScrollingBanner: No banner text available, animation not started');
       return;
     }
 
-    console.log('🎬 ScrollingBanner: Starting animation for banner text:', banner.text.substring(0, 50) + (banner.text.length > 50 ? '...' : ''));
+    console.log('🎬 ScrollingBanner: Starting animation for banner text:', currentBanner.text.substring(0, 50) + (currentBanner.text.length > 50 ? '...' : ''));
 
     const interval = setInterval(() => {
       setScrollPosition(prev => {
@@ -91,9 +90,9 @@ export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
     }, 30); // Smoother animation with 30ms intervals
 
     return () => clearInterval(interval);
-  }, [banner?.text]);
+  }, [currentBanner?.text]);
 
-  if (!banner?.text) {
+  if (!currentBanner?.text) {
     return null;
   }
 
@@ -108,8 +107,21 @@ export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
               transition: 'none'
             }}
           >
-            📢 {banner.text} 📢 {banner.text} 📢 {banner.text} 📢 {banner.text} 📢 {banner.text}
+            📢 {currentBanner.text} 📢 {currentBanner.text} 📢 {currentBanner.text} 📢 {currentBanner.text} 📢 {currentBanner.text}
           </div>
+          {/* Banner indicator for multiple banners */}
+          {appropriateBanners.length > 1 && (
+            <div className="absolute top-1 right-4 flex gap-1">
+              {appropriateBanners.map((_, index) => (
+                <div
+                  key={index}
+                  className={`w-2 h-2 rounded-full ${
+                    index === currentBannerIndex ? 'bg-white' : 'bg-white/50'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
