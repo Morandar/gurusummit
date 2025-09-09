@@ -145,6 +145,11 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
 
   const unreadNotificationsCount = userNotifications.filter(n => n.isActive).length;
 
+  // Debug logs for notifications
+  console.log('🔔 ParticipantDashboard: Total notifications:', notifications.length);
+  console.log('👤 ParticipantDashboard: Filtered user notifications:', userNotifications.length);
+  console.log('📬 ParticipantDashboard: Unread notifications count:', unreadNotificationsCount);
+
   const handleBoothVisit = (boothId: number, boothName: string) => {
     if (!visitedBooths.includes(boothId)) {
       setSelectedBooth({ id: boothId, name: boothName });
@@ -448,6 +453,9 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
 
                     const categoryInfo = getCategoryInfo(item.category || 'lecture');
                     const CategoryIcon = categoryInfo.icon;
+
+                    // Debug log for program categories
+                    console.log('📅 ParticipantDashboard: Program item:', item.event, 'Category:', item.category, 'CategoryInfo:', categoryInfo);
 
                     return (
                       <div

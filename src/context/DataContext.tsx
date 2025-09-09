@@ -385,8 +385,15 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const fetchProgram = async () => {
+    console.log('🔄 DataContext: Fetching program from Supabase...');
     const { data, error } = await supabase.from('program').select('*').order('time');
-    if (!error && data) setProgram(data as any);
+    if (!error && data) {
+      console.log('✅ DataContext: Fetched program events:', data.length);
+      console.log('📋 DataContext: Program categories check:', data.map(item => ({ event: item.event, category: item.category })));
+      setProgram(data as any);
+    } else if (error) {
+      console.error('❌ DataContext: Error fetching program:', error);
+    }
   };
 
   const fetchWinners = async () => {
@@ -431,6 +438,26 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchNotifications = async () => {
+    console.log('🔄 DataContext: Fetching notifications from Supabase...');
+    const { data, error } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+    if (!error && data) {
+      console.log('✅ DataContext: Fetched notifications:', data.length, 'notifications');
+      const mappedNotifications = data.map((notification: any) => ({
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        targetAudience: notification.target_audience,
+        createdAt: notification.created_at,
+        createdBy: notification.created_by,
+        isActive: notification.is_active
+      }));
+      setNotifications(mappedNotifications);
+    } else if (error) {
+      console.error('❌ DataContext: Error fetching notifications:', error);
+    }
+  };
+
   const fetchSettings = async () => {
     try {
       // Fetch code time settings
@@ -471,10 +498,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       try {
         const { data: boothsData } = await supabase.from('booths').select('*').order('id');
         const totalBooths = boothsData?.length || 0;
-        
+
         await fetchBooths(); // Fetch booths first
         await fetchUsers(totalBooths); // Pass booth count to users
         await fetchProgram();
+        await fetchNotifications(); // Fetch notifications from database
         await fetchWinners(); // Fetch winners from database
         await fetchDiscountedPhones(); // Fetch discounted phones from database
         await fetchSettings(); // Fetch settings from database
