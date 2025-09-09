@@ -75,6 +75,16 @@ interface DiscountedPhone {
   description?: string;
 }
 
+interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  targetAudience: 'all' | 'participants' | 'booth_staff';
+  createdAt: string;
+  createdBy: string;
+  isActive: boolean;
+}
+
 export interface Banner {
   id: number;
   text: string;
@@ -92,6 +102,7 @@ interface DataContextType {
   homePageTexts: HomePageTexts;
   winners: Winner[];
   discountedPhones: DiscountedPhone[];
+  notifications: Notification[];
   banner: Banner | null;
   isLoading: boolean;
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -101,6 +112,7 @@ interface DataContextType {
   setHomePageTexts: React.Dispatch<React.SetStateAction<HomePageTexts>>;
   setWinners: React.Dispatch<React.SetStateAction<Winner[]>>;
   setDiscountedPhones: React.Dispatch<React.SetStateAction<DiscountedPhone[]>>;
+  setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
   setBanner: React.Dispatch<React.SetStateAction<Banner | null>>;
   visitBooth: (userId: number, boothId: number) => Promise<void>;
   getUserProgress: (userId: number) => number;
@@ -112,6 +124,8 @@ interface DataContextType {
   registerParticipant: (userData: Omit<User, 'id' | 'progress' | 'visits' | 'visitedBooths' | 'password_hash'> & { password: string }) => Promise<boolean>;
   loginParticipant: (personalNumber: string, password: string) => Promise<User | null>;
   addUserByAdmin: (userData: { personalNumber: string; firstName: string; lastName: string; position: string; password?: string }) => Promise<boolean>;
+  createNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => Promise<void>;
+  markNotificationAsRead: (notificationId: number, userId: number) => Promise<void>;
   updateBanner: (text: string, isActive: boolean, targetAudience?: 'all' | 'participants' | 'booth_staff') => Promise<void>;
 }
 
@@ -215,6 +229,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [homePageTexts, setHomePageTextsState] = useState<HomePageTexts>(initialHomePageTexts);
   const [winners, setWinnersState] = useState<Winner[]>([]);
   const [discountedPhones, setDiscountedPhones] = useState<DiscountedPhone[]>(initialDiscountedPhones);
+  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
   const [banner, setBanner] = useState<Banner | null>(null);
 
   // Registrace účastníka: hashování hesla a uložení do DB
@@ -489,6 +504,26 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchNotifications = async () => {
+    console.log('🔄 DataContext: Fetching notifications from Supabase...');
+    const { data, error } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+    if (!error && data) {
+      console.log('✅ DataContext: Fetched notifications:', data.length, 'notifications');
+      const mappedNotifications = data.map((notification: any) => ({
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        targetAudience: notification.target_audience,
+        createdAt: notification.created_at,
+        createdBy: notification.created_by,
+        isActive: notification.is_active
+      }));
+      setNotifications(mappedNotifications);
+    } else if (error) {
+      console.error('❌ DataContext: Error fetching notifications:', error);
+    }
+  };
+
   const fetchSettings = async () => {
     try {
       // Fetch code time settings
@@ -533,6 +568,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         await fetchBooths(); // Fetch booths first
         await fetchUsers(totalBooths); // Pass booth count to users
         await fetchProgram();
+        await fetchNotifications(); // Fetch notifications from database
         await fetchBanner(); // Fetch banner from database
         await fetchWinners(); // Fetch winners from database
         await fetchDiscountedPhones(); // Fetch discounted phones from database
@@ -797,6 +833,57 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }));
   }, [booths.length]);
 
+  const createNotification = async (notification: Omit<Notification, 'id' | 'createdAt'>) => {
+    try {
+      const newNotification = {
+        ...notification,
+        createdAt: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert([{
+          title: newNotification.title,
+          message: newNotification.message,
+          target_audience: newNotification.targetAudience,
+          created_by: newNotification.createdBy,
+          is_active: newNotification.isActive
+        }])
+        .select();
+
+      if (error) {
+        console.error('Error creating notification:', error);
+        return;
+      }
+
+      if (data && data[0]) {
+        const createdNotification: Notification = {
+          id: data[0].id,
+          title: data[0].title,
+          message: data[0].message,
+          targetAudience: data[0].target_audience,
+          createdAt: data[0].created_at,
+          createdBy: data[0].created_by,
+          isActive: data[0].is_active
+        };
+
+        setNotifications(prev => [createdNotification, ...prev]);
+      }
+    } catch (error) {
+      console.error('Create notification error:', error);
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId: number, userId: number) => {
+    try {
+      // This would typically update a user_notifications table
+      // For now, we'll just log it
+      console.log(`Notification ${notificationId} marked as read by user ${userId}`);
+    } catch (error) {
+      console.error('Mark notification as read error:', error);
+    }
+  };
+
   const updateBanner = async (text: string, isActive: boolean, targetAudience: 'all' | 'participants' | 'booth_staff' = 'all') => {
     console.log('📢 DataContext: Updating banner:', { text, isActive, targetAudience });
     try {
@@ -871,6 +958,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       homePageTexts,
       winners,
       discountedPhones,
+      notifications,
       banner,
       isLoading,
       setUsers,
@@ -880,6 +968,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       setHomePageTexts,
       setWinners,
       setDiscountedPhones,
+      setNotifications,
       setBanner,
       visitBooth,
       getUserProgress,
@@ -891,6 +980,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       registerParticipant,
       loginParticipant,
       addUserByAdmin,
+      createNotification,
+      markNotificationAsRead,
       updateBanner,
     }}>
       {children}
