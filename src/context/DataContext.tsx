@@ -754,11 +754,20 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, [booths.length]);
 
   const createNotification = async (notification: Omit<Notification, 'id' | 'createdAt'>) => {
+    console.log('🔔 DataContext: Creating notification:', notification);
     try {
       const newNotification = {
         ...notification,
         createdAt: new Date().toISOString()
       };
+
+      console.log('📤 DataContext: Inserting notification to database:', {
+        title: newNotification.title,
+        message: newNotification.message,
+        target_audience: newNotification.targetAudience,
+        created_by: newNotification.createdBy,
+        is_active: newNotification.isActive
+      });
 
       const { data, error } = await supabase
         .from('notifications')
@@ -772,7 +781,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         .select();
 
       if (error) {
-        console.error('Error creating notification:', error);
+        console.error('❌ DataContext: Error creating notification:', error);
         return;
       }
 
@@ -787,10 +796,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           isActive: data[0].is_active
         };
 
+        console.log('✅ DataContext: Notification created successfully:', createdNotification);
         setNotifications(prev => [createdNotification, ...prev]);
+        console.log('🔄 DataContext: Local notifications state updated');
+      } else {
+        console.warn('⚠️ DataContext: No data returned from notification creation');
       }
     } catch (error) {
-      console.error('Create notification error:', error);
+      console.error('❌ DataContext: Create notification error:', error);
     }
   };
 

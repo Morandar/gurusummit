@@ -1244,6 +1244,11 @@ export const AdminDashboard = () => {
                 <Button
                   onClick={async () => {
                     if (notificationForm.title && notificationForm.message) {
+                      console.log('📤 AdminDashboard: Sending notification:', {
+                        title: notificationForm.title,
+                        message: notificationForm.message,
+                        targetAudience: notificationForm.targetAudience
+                      });
                       await createNotification({
                         title: notificationForm.title,
                         message: notificationForm.message,
@@ -1251,6 +1256,7 @@ export const AdminDashboard = () => {
                         createdBy: 'admin',
                         isActive: true
                       });
+                      console.log('✅ AdminDashboard: createNotification called');
                       setNotificationForm({ title: '', message: '', targetAudience: 'all' });
                       toast({ title: 'Upozornění odesláno', description: 'Upozornění bylo úspěšně odesláno' });
                     }
@@ -1270,6 +1276,10 @@ export const AdminDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {(() => {
+                  console.log('📋 AdminDashboard: Current notifications in state:', notifications.length, notifications);
+                  return null;
+                })()}
                 {notifications.length === 0 ? (
                   <p className="text-muted-foreground text-center py-4">
                     Žádná upozornění nebyla dosud odeslána
