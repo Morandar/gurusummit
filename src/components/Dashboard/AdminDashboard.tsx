@@ -26,7 +26,7 @@ export const AdminDashboard = () => {
   const {
     users, booths, program, codeTimeSettings, homePageTexts, winners, discountedPhones, banner,
     setUsers, setBooths, setProgram, setCodeTimeSettings, setHomePageTexts, setDiscountedPhones, setBanner,
-    resetAllProgress, removeUserProfileImage, addUserByAdmin, updateBanner
+    resetAllProgress, removeUserProfileImage, addUserByAdmin, updateBanner, fetchAllBanners
   } = useData();
 
   console.log('🎛️ AdminDashboard: Current banner state:', banner);
@@ -67,7 +67,7 @@ export const AdminDashboard = () => {
     targetAudience: 'all' as 'all' | 'participants' | 'booth_staff'
   });
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
-  const [bannerList, setBannerList] = useState<Banner[]>([]);
+  const [allBanners, setAllBanners] = useState<Banner[]>([]);
 
   
   // Local draft state for homepage texts
@@ -119,6 +119,12 @@ export const AdminDashboard = () => {
     setHomePageTextsDraft(homePageTexts);
     setHasUnsavedChanges(false);
   }, [homePageTexts]);
+
+  // Load all banners when component mounts
+  useEffect(() => {
+    console.log('🎛️ AdminDashboard: Loading all banners on mount');
+    loadAllBanners();
+  }, []);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -682,26 +688,83 @@ export const AdminDashboard = () => {
   };
 
   const handleDeleteBanner = async (bannerId: number) => {
+    console.log('🗑️ AdminDashboard: Deleting banner with ID:', bannerId);
     try {
-      // For now, just deactivate the banner since we don't have a delete function
-      await updateBanner('', false);
-      toast({ title: 'Banner smazán', description: 'Banner byl deaktivován' });
+      // Delete banner from Supabase
+      const { error } = await supabase.from('banner').delete().eq('id', bannerId);
+
+      if (error) {
+        console.error('❌ AdminDashboard: Error deleting banner from Supabase:', error);
+        toast({ title: 'Chyba při mazání banneru', description: error.message });
+        return;
+      }
+
+      console.log('✅ AdminDashboard: Banner deleted from Supabase successfully');
+      // Refresh the banner list after deletion
+      console.log('🔄 AdminDashboard: Refreshing banner list after deletion');
+      await loadAllBanners();
+
+      // If the deleted banner was active, also refresh the active banner
+      if (banner && banner.id === bannerId) {
+        console.log('🔄 AdminDashboard: Deleted banner was active, refreshing page to update active banner state');
+        // This will trigger a refetch of the active banner
+        window.location.reload(); // Simple way to refresh the active banner state
+      }
+
+      toast({ title: 'Banner smazán', description: 'Banner byl úspěšně odstraněn' });
     } catch (error) {
-      console.error('Delete banner error:', error);
+      console.error('❌ AdminDashboard: Delete banner error:', error);
       toast({ title: 'Chyba při mazání banneru', description: 'Nastala neočekávaná chyba' });
     }
   };
 
   const handleToggleBanner = async (banner: Banner, isActive: boolean) => {
+    console.log('🎛️ AdminDashboard: Toggling banner:', {
+      id: banner.id,
+      text: banner.text.substring(0, 30) + (banner.text.length > 30 ? '...' : ''),
+      fromActive: banner.isActive,
+      toActive: isActive
+    });
     try {
       await updateBanner(banner.text, isActive, banner.targetAudience);
+      console.log('✅ AdminDashboard: Banner toggle successful');
       toast({
         title: isActive ? 'Banner aktivován' : 'Banner deaktivován',
         description: `Banner byl ${isActive ? 'aktivován' : 'deaktivován'}`
       });
+      // Refresh the banner list after toggling
+      console.log('🔄 AdminDashboard: Refreshing banner list after toggle');
+      await loadAllBanners();
     } catch (error) {
-      console.error('Toggle banner error:', error);
+      console.error('❌ AdminDashboard: Toggle banner error:', error);
       toast({ title: 'Chyba při změně stavu banneru', description: 'Nastala neočekávaná chyba' });
+    }
+  };
+
+  const loadAllBanners = async () => {
+    try {
+      console.log('🎛️ AdminDashboard: Calling fetchAllBanners()');
+      const banners = await fetchAllBanners();
+      console.log('🎛️ AdminDashboard: fetchAllBanners() returned:', banners.length, 'banners');
+      console.log('🎛️ AdminDashboard: Banner details:', banners.map(b => ({
+        id: b.id,
+        text: b.text.substring(0, 30) + (b.text.length > 30 ? '...' : ''),
+        isActive: b.isActive,
+        targetAudience: b.targetAudience,
+        createdAt: b.createdAt
+      })));
+
+      // Clear any potential cached data
+      setAllBanners([]);
+      // Then set the fresh data
+      setTimeout(() => {
+        setAllBanners(banners);
+        console.log('🎛️ AdminDashboard: allBanners state updated with', banners.length, 'banners');
+      }, 0);
+
+    } catch (error) {
+      console.error('❌ AdminDashboard: Error loading all banners:', error);
+      toast({ title: 'Chyba při načítání bannerů', description: 'Nastala neočekávaná chyba' });
     }
   };
 
@@ -1341,48 +1404,87 @@ export const AdminDashboard = () => {
             {/* Banner Management Section */}
             <Card>
               <CardHeader>
-                <CardTitle>Správa bannerů</CardTitle>
-                <CardDescription>
-                  Aktivujte, deaktivujte nebo smažte existující bannery
-                </CardDescription>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Správa bannerů</CardTitle>
+                    <CardDescription>
+                      Aktivujte, deaktivujte nebo smažte existující bannery
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      console.log('🔄 AdminDashboard: Manual banner refresh triggered');
+                      loadAllBanners();
+                    }}
+                  >
+                    🔄 Obnovit
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {/* Active banner management */}
-                  {banner && (
-                    <div className="flex items-center justify-between p-4 border rounded-lg bg-green-50 border-green-200">
-                      <div className="flex-1">
-                        <div className="font-medium">{banner.text}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Cílová skupina: {banner.targetAudience === 'all' ? 'Všichni' :
-                                         banner.targetAudience === 'participants' ? 'Účastníci' : 'Stánkaři'}
+                  {allBanners.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Žádné bannery nejsou k dispozici</p>
+                    </div>
+                  ) : (
+                    allBanners.map((bannerItem) => {
+                      console.log('🎛️ AdminDashboard: Rendering banner:', {
+                        id: bannerItem.id,
+                        text: bannerItem.text.substring(0, 30) + (bannerItem.text.length > 30 ? '...' : ''),
+                        isActive: bannerItem.isActive,
+                        targetAudience: bannerItem.targetAudience
+                      });
+                      return (
+                        <div
+                          key={bannerItem.id}
+                          className={`flex items-center justify-between p-4 border rounded-lg ${
+                            bannerItem.isActive
+                              ? 'bg-green-50 border-green-200'
+                              : 'bg-gray-50 border-gray-200'
+                          }`}
+                        >
+                        <div className="flex-1">
+                          <div className="font-medium">{bannerItem.text}</div>
+                          <div className="text-sm text-muted-foreground">
+                            Cílová skupina: {bannerItem.targetAudience === 'all' ? 'Všichni' :
+                                          bannerItem.targetAudience === 'participants' ? 'Účastníci' : 'Stánkaři'}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Vytvořeno: {new Date(bannerItem.createdAt).toLocaleString('cs-CZ')}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              bannerItem.isActive
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {bannerItem.isActive ? 'Aktivní' : 'Neaktivní'}
+                            </span>
+                            <Switch
+                              checked={bannerItem.isActive}
+                              onCheckedChange={(checked) => handleToggleBanner(bannerItem, checked)}
+                            />
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleEditBanner(bannerItem)}>
+                            <Edit className="h-4 w-4 mr-1" />
+                            Upravit
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteBanner(bannerItem.id)}>
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Smazat
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={banner.isActive}
-                          onCheckedChange={(checked) => handleToggleBanner(banner, checked)}
-                        />
-                        <Button variant="outline" size="sm" onClick={() => handleEditBanner(banner)}>
-                          <Edit className="h-4 w-4 mr-1" />
-                          Upravit
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => handleDeleteBanner(banner.id)}>
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Smazat
-                        </Button>
-                      </div>
-                    </div>
+                      );
+                    })
                   )}
-
                 </div>
-
-                {(!banner) && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>Žádný banner není aktivní</p>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>

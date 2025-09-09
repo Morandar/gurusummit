@@ -127,6 +127,7 @@ interface DataContextType {
   createNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => Promise<void>;
   markNotificationAsRead: (notificationId: number, userId: number) => Promise<void>;
   updateBanner: (text: string, isActive: boolean, targetAudience?: 'all' | 'participants' | 'booth_staff') => Promise<void>;
+  fetchAllBanners: () => Promise<Banner[]>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -452,23 +453,46 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const fetchBanner = async () => {
-    console.log('🔄 DataContext: Fetching banner from Supabase...');
+    console.log('🔄 DataContext: Fetching active banner from Supabase...');
+    const startTime = Date.now();
+
+    // Check authentication status
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('🔐 DataContext: Auth session check:', {
+        hasSession: !!sessionData?.session,
+        userEmail: sessionData?.session?.user?.email || 'none',
+        expiresAt: sessionData?.session?.expires_at ? new Date(sessionData.session.expires_at * 1000).toISOString() : 'none'
+      });
+    } catch (authError) {
+      console.warn('⚠️ DataContext: Could not check auth session:', authError);
+    }
+
     try {
       const { data, error } = await supabase.from('banner').select('*').eq('is_active', true).single();
+      const fetchTime = Date.now() - startTime;
+      console.log(`⏱️ DataContext: Banner fetch took ${fetchTime}ms`);
 
       if (error) {
-        if (error.code === 'PGRST116') {
+        console.error('❌ DataContext: Supabase error fetching banner:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          fetchTime: `${fetchTime}ms`
+        });
+
+        // Check for network-related errors
+        if (error.message?.includes('fetch')) {
+          console.error('🌐 DataContext: Network error detected - possible connectivity issue after network change');
+        } else if (error.message?.includes('timeout')) {
+          console.error('⏰ DataContext: Timeout error - network may be slow or unreachable');
+        } else if (error.code === 'PGRST116') {
           // No active banner found
-          console.log('ℹ️ DataContext: No active banner found');
+          console.log('ℹ️ DataContext: No active banner found (this is normal)');
           setBanner(null);
         } else {
-          console.error('❌ DataContext: Error fetching banner:', error);
-          console.error('❌ DataContext: Error details:', {
-            code: error.code,
-            message: error.message,
-            details: error.details,
-            hint: error.hint
-          });
+          console.error('❌ DataContext: Database or authentication error:', error);
         }
         return;
       }
@@ -476,11 +500,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (data) {
         console.log('✅ DataContext: Fetched active banner:', {
           id: data.id,
-          text: data.text,
+          text: data.text.substring(0, 50) + (data.text.length > 50 ? '...' : ''),
           isActive: data.is_active,
           targetAudience: data.target_audience,
           createdAt: data.created_at,
-          createdBy: data.created_by
+          createdBy: data.created_by,
+          fetchTime: `${fetchTime}ms`
         });
 
         const bannerData = {
@@ -493,14 +518,60 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         };
 
         setBanner(bannerData);
-        console.log('✅ DataContext: Banner set in state:', bannerData);
+        console.log('✅ DataContext: Banner set in state successfully');
       } else {
-        console.log('ℹ️ DataContext: No banner data returned');
+        console.log('ℹ️ DataContext: No banner data returned from Supabase');
         setBanner(null);
       }
-    } catch (error) {
-      console.error('❌ DataContext: Unexpected error fetching banner:', error);
+    } catch (error: any) {
+      const fetchTime = Date.now() - startTime;
+      console.error('❌ DataContext: Unexpected error fetching banner:', {
+        error: error.message || error,
+        stack: error.stack,
+        fetchTime: `${fetchTime}ms`
+      });
+
+      // Check for specific network errors
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        console.error('🌐 DataContext: Network connectivity error - check internet connection after network change');
+      } else if (error.message?.includes('CORS')) {
+        console.error('🚫 DataContext: CORS error - possible firewall or proxy blocking requests');
+      } else if (error.message?.includes('DNS')) {
+        console.error('🌍 DataContext: DNS resolution error - network configuration issue');
+      }
+
       setBanner(null);
+    }
+  };
+
+  const fetchAllBanners = async () => {
+    console.log('🔄 DataContext: Fetching all banners from Supabase...');
+    try {
+      const { data, error } = await supabase.from('banner').select('*').order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ DataContext: Error fetching all banners:', error);
+        return [];
+      }
+
+      if (data) {
+        console.log('✅ DataContext: Fetched all banners:', data.length, 'banners');
+        const mappedBanners = data.map((banner: any) => ({
+          id: banner.id,
+          text: banner.text,
+          isActive: banner.is_active,
+          targetAudience: banner.target_audience || 'all',
+          createdAt: banner.created_at,
+          createdBy: banner.created_by
+        }));
+        return mappedBanners;
+      } else {
+        console.log('ℹ️ DataContext: No banners data returned');
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ DataContext: Unexpected error fetching all banners:', error);
+      return [];
     }
   };
 
@@ -585,14 +656,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     // Set up periodic banner check every 30 seconds
     console.log('📢 DataContext: Setting up banner polling every 30 seconds');
+    let pollCount = 0;
     const bannerInterval = setInterval(() => {
-      console.log('🔄 DataContext: Polling for banner updates');
+      pollCount++;
+      console.log(`🔄 DataContext: Banner poll #${pollCount} - checking for updates`);
       fetchBanner();
     }, 30000); // Check every 30 seconds
 
     // Cleanup interval on unmount
     return () => {
-      console.log('🧹 DataContext: Cleaning up banner polling');
+      console.log('🧹 DataContext: Cleaning up banner polling after', pollCount, 'polls');
       clearInterval(bannerInterval);
     };
   }, []);
@@ -921,11 +994,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           toast({ title: 'Banner aktualizován', description: 'Banner byl úspěšně aktualizován' });
         }
       } else {
-        // Deactivate banner
+        // Deactivate specific banner by text and target audience
         const { error } = await supabase
           .from('banner')
           .update({ is_active: false })
-          .eq('is_active', true);
+          .eq('text', text.trim())
+          .eq('target_audience', targetAudience);
 
         if (error) {
           console.error('❌ DataContext: Error deactivating banner:', error);
@@ -934,7 +1008,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         }
 
         console.log('✅ DataContext: Banner deactivated');
-        setBanner(null);
+        // Refresh the active banner state
+        await fetchBanner();
         toast({ title: 'Banner deaktivován', description: 'Banner byl úspěšně deaktivován' });
       }
     } catch (error) {
@@ -983,6 +1058,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       createNotification,
       markNotificationAsRead,
       updateBanner,
+      fetchAllBanners,
     }}>
       {children}
     </DataContext.Provider>

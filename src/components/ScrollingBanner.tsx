@@ -8,15 +8,20 @@ interface ScrollingBannerProps {
 export const ScrollingBanner = ({ banner }: ScrollingBannerProps) => {
   const [scrollPosition, setScrollPosition] = useState(100);
 
-  console.log('🎬 ScrollingBanner: Received banner:', banner);
+  console.log('🎬 ScrollingBanner: Component rendered with banner:', banner ? {
+    id: banner.id,
+    text: banner.text.substring(0, 30) + (banner.text.length > 30 ? '...' : ''),
+    isActive: banner.isActive,
+    targetAudience: banner.targetAudience
+  } : 'null');
 
   useEffect(() => {
     if (!banner?.text) {
-      console.log('🎬 ScrollingBanner: No banner text, not starting animation');
+      console.log('🎬 ScrollingBanner: No banner text available, animation not started');
       return;
     }
 
-    console.log('🎬 ScrollingBanner: Starting animation for banner:', banner.text);
+    console.log('🎬 ScrollingBanner: Starting animation for banner text:', banner.text.substring(0, 50) + (banner.text.length > 50 ? '...' : ''));
 
     const interval = setInterval(() => {
       setScrollPosition(prev => {
