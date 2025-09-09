@@ -447,11 +447,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       const mappedNotifications = data.map((notification: any) => {
         // Get current user ID - try multiple sources
         let userId = 'anonymous';
+        let userSource = 'none';
+
         try {
           // First try to get from context if available
           const authUser = (window as any).__authUser;
           if (authUser?.id) {
             userId = authUser.id;
+            userSource = 'window';
           } else {
             // Fallback to localStorage
             const storedUser = localStorage.getItem('authUser');
@@ -459,6 +462,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
               const parsedUser = JSON.parse(storedUser);
               if (parsedUser?.id) {
                 userId = parsedUser.id;
+                userSource = 'localStorage';
                 // Store in window for future use
                 (window as any).__authUser = parsedUser;
               }
@@ -471,7 +475,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         const readKey = `notification_read_${userId}_${notification.id}`;
         const isRead = localStorage.getItem(readKey) === 'true';
 
-        console.log(`📧 Notification ${notification.id} read status for user ${userId}:`, isRead);
+        console.log(`📧 Notification ${notification.id} read status for user ${userId} (from ${userSource}):`, isRead, 'key:', readKey);
 
         return {
           id: notification.id,
@@ -558,15 +562,33 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         table: 'notifications'
       }, (payload) => {
         console.log('📡 DataContext: Notifications table changed:', payload);
+        console.log('📡 DataContext: Event type:', payload.eventType);
+        console.log('📡 DataContext: New record:', payload.new);
         // Refetch notifications when any change occurs
         fetchNotifications();
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 DataContext: Subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('📡 DataContext: Successfully subscribed to notifications');
+        } else if (status === 'CLOSED') {
+          console.log('📡 DataContext: Subscription closed');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('📡 DataContext: Subscription channel error');
+        }
+      });
 
-    // Cleanup subscription on unmount
+    // Fallback: Periodic check for new notifications every 30 seconds
+    const fallbackInterval = setInterval(() => {
+      console.log('🔄 DataContext: Fallback check for new notifications');
+      fetchNotifications();
+    }, 30000); // Check every 30 seconds
+
+    // Cleanup subscription and interval on unmount
     return () => {
-      console.log('📡 DataContext: Cleaning up notifications subscription');
+      console.log('📡 DataContext: Cleaning up notifications subscription and fallback');
       notificationsSubscription.unsubscribe();
+      clearInterval(fallbackInterval);
     };
   }, []);
 
@@ -853,11 +875,15 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         setNotifications(prev => [createdNotification, ...prev]);
         console.log('🔄 DataContext: Local notifications state updated');
 
-        // Refetch notifications to ensure all clients get the update
+        // Refetch notifications immediately to ensure all clients get the update
+        console.log('🚀 DataContext: Triggering immediate refetch for real-time update');
+        fetchNotifications();
+
+        // Also trigger after a short delay as backup
         setTimeout(() => {
-          console.log('🔄 DataContext: Refetching notifications for real-time update');
+          console.log('🔄 DataContext: Backup refetch for real-time update');
           fetchNotifications();
-        }, 1000);
+        }, 2000);
       } else {
         console.warn('⚠️ DataContext: No data returned from notification creation');
       }
@@ -876,6 +902,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       // Store read status in localStorage (keyed by userId and notificationId)
       const readKey = `notification_read_${userIdStr}_${notificationId}`;
       localStorage.setItem(readKey, 'true');
+      console.log(`💾 DataContext: Stored read status in localStorage:`, readKey, '=', localStorage.getItem(readKey));
 
       // Update window object for consistency
       if (!(window as any).__authUser) {
@@ -890,6 +917,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       ));
 
       console.log(`✅ DataContext: Notification ${notificationId} marked as read for user ${userIdStr}`);
+      console.log(`🔍 DataContext: Current localStorage keys:`, Object.keys(localStorage).filter(key => key.startsWith('notification_read_')));
     } catch (error) {
       console.error('❌ DataContext: Mark notification as read error:', error);
     }
