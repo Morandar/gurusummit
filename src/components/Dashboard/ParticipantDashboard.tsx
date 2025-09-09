@@ -310,23 +310,38 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                         onClick={() => handleBoothVisit(booth.id, booth.name)}
                       >
                         <CardContent className="p-4">
-                          <div className="flex items-start justify-between mb-2">
-                            <h3 className="font-medium text-sm sm:text-base leading-tight">{booth.name}</h3>
-                            <div className="flex-shrink-0 ml-2">
-                              {isVisited ? (
-                                <Badge variant="secondary" className="text-xs">
-                                  ✓ OK
-                                </Badge>
-                              ) : (
-                                <Lock className="h-4 w-4 text-muted-foreground" />
-                              )}
+                          <div className="flex items-start gap-3 mb-3">
+                            {booth.logo ? (
+                              <img
+                                src={booth.logo}
+                                alt={`${booth.name} logo`}
+                                className="w-10 h-10 object-contain rounded-lg bg-white border"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                                <MapPin className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between">
+                                <h3 className="font-medium text-sm sm:text-base leading-tight truncate">{booth.name}</h3>
+                                <div className="flex-shrink-0 ml-2">
+                                  {isVisited ? (
+                                    <Badge variant="secondary" className="text-xs">
+                                      ✓ OK
+                                    </Badge>
+                                  ) : (
+                                    <Lock className="h-4 w-4 text-muted-foreground" />
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                                {booth.category}
+                              </p>
                             </div>
                           </div>
-                          <p className="text-xs sm:text-sm text-muted-foreground">
-                            {booth.category}
-                          </p>
                           {!isVisited && (
-                            <p className="text-xs text-primary mt-1 font-medium">
+                            <p className="text-xs text-primary font-medium">
                               Klepněte pro zadání kódu
                             </p>
                           )}
