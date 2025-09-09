@@ -24,7 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 export const AdminDashboard = () => {
   const { logout } = useAuth();
   const {
-    users, booths, program, codeTimeSettings, homePageTexts, winners, discountedPhones, banner,
+    users, booths, program, codeTimeSettings, homePageTexts, winners, discountedPhones, banners, banner,
     setUsers, setBooths, setProgram, setCodeTimeSettings, setHomePageTexts, setDiscountedPhones, setBanner,
     resetAllProgress, removeUserProfileImage, addUserByAdmin, updateBanner, fetchAllBanners
   } = useData();
@@ -1367,35 +1367,35 @@ export const AdminDashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Active Banner Preview */}
-            {banner && (
+            {/* Active Banners Preview */}
+            {banners && banners.length > 0 && (
               <Card className="border-green-200 bg-green-50">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-green-800">
                     <Eye className="h-5 w-5" />
-                    Aktivní banner
+                    Aktivní bannery ({banners.length})
                   </CardTitle>
                   <CardDescription className="text-green-700">
-                    Tento banner se právě zobrazuje uživatelům
+                    Tyto bannery se právě zobrazují uživatelům podle jejich typu
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    <div className="p-3 bg-white rounded border">
-                      <div className="text-sm text-muted-foreground mb-1">Text:</div>
-                      <div className="font-medium">{banner.text}</div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Cílová skupina:</span>
-                      <Badge variant="outline">
-                        {banner.targetAudience === 'all' ? 'Všichni' :
-                         banner.targetAudience === 'participants' ? 'Účastníci' : 'Stánkaři'}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Vytvořeno:</span>
-                      <span className="text-sm">{new Date(banner.createdAt).toLocaleString('cs-CZ')}</span>
-                    </div>
+                  <div className="space-y-4">
+                    {banners.map((activeBanner, index) => (
+                      <div key={activeBanner.id} className="p-3 bg-white rounded border">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="text-sm text-muted-foreground">Banner {index + 1}:</div>
+                          <Badge variant="outline" className="text-xs">
+                            {activeBanner.targetAudience === 'all' ? 'Všichni' :
+                             activeBanner.targetAudience === 'participants' ? 'Účastníci' : 'Stánkaři'}
+                          </Badge>
+                        </div>
+                        <div className="font-medium mb-2">{activeBanner.text}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Vytvořeno: {new Date(activeBanner.createdAt).toLocaleString('cs-CZ')}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
