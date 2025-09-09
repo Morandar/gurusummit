@@ -28,6 +28,8 @@ export const AdminDashboard = () => {
     setUsers, setBooths, setProgram, setCodeTimeSettings, setHomePageTexts, setDiscountedPhones, setBanner,
     resetAllProgress, removeUserProfileImage, addUserByAdmin, updateBanner
   } = useData();
+
+  console.log('🎛️ AdminDashboard: Current banner state:', banner);
   const isLoading = false; // Temporary fix for TS cache issue
   const { toast } = useToast();
   const [timeToNext, setTimeToNext] = useState(0);

@@ -8,8 +8,15 @@ interface ScrollingBannerProps {
 export const ScrollingBanner = ({ banner }: ScrollingBannerProps) => {
   const [scrollPosition, setScrollPosition] = useState(100);
 
+  console.log('🎬 ScrollingBanner: Received banner:', banner);
+
   useEffect(() => {
-    if (!banner?.text) return;
+    if (!banner?.text) {
+      console.log('🎬 ScrollingBanner: No banner text, not starting animation');
+      return;
+    }
+
+    console.log('🎬 ScrollingBanner: Starting animation for banner:', banner.text);
 
     const interval = setInterval(() => {
       setScrollPosition(prev => {

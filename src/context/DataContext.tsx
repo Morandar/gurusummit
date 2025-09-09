@@ -438,23 +438,54 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchBanner = async () => {
     console.log('🔄 DataContext: Fetching banner from Supabase...');
-    const { data, error } = await supabase.from('banner').select('*').eq('is_active', true).single();
-    if (!error && data) {
-      console.log('✅ DataContext: Fetched active banner:', data.text);
-      setBanner({
-        id: data.id,
-        text: data.text,
-        isActive: data.is_active,
-        targetAudience: data.target_audience,
-        createdAt: data.created_at,
-        createdBy: data.created_by
-      });
-    } else if (error?.code === 'PGRST116') {
-      // No active banner found
-      console.log('ℹ️ DataContext: No active banner found');
+    try {
+      const { data, error } = await supabase.from('banner').select('*').eq('is_active', true).single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No active banner found
+          console.log('ℹ️ DataContext: No active banner found');
+          setBanner(null);
+        } else {
+          console.error('❌ DataContext: Error fetching banner:', error);
+          console.error('❌ DataContext: Error details:', {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint
+          });
+        }
+        return;
+      }
+
+      if (data) {
+        console.log('✅ DataContext: Fetched active banner:', {
+          id: data.id,
+          text: data.text,
+          isActive: data.is_active,
+          targetAudience: data.target_audience,
+          createdAt: data.created_at,
+          createdBy: data.created_by
+        });
+
+        const bannerData = {
+          id: data.id,
+          text: data.text,
+          isActive: data.is_active,
+          targetAudience: data.target_audience || 'all',
+          createdAt: data.created_at,
+          createdBy: data.created_by
+        };
+
+        setBanner(bannerData);
+        console.log('✅ DataContext: Banner set in state:', bannerData);
+      } else {
+        console.log('ℹ️ DataContext: No banner data returned');
+        setBanner(null);
+      }
+    } catch (error) {
+      console.error('❌ DataContext: Unexpected error fetching banner:', error);
       setBanner(null);
-    } else if (error) {
-      console.error('❌ DataContext: Error fetching banner:', error);
     }
   };
 
