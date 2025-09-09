@@ -103,7 +103,8 @@ interface DataContextType {
   winners: Winner[];
   discountedPhones: DiscountedPhone[];
   notifications: Notification[];
-  banner: Banner | null;
+  banners: Banner[];
+  banner: Banner | null; // Keep for backward compatibility
   isLoading: boolean;
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   setBooths: React.Dispatch<React.SetStateAction<Booth[]>>;
@@ -232,6 +233,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [discountedPhones, setDiscountedPhones] = useState<DiscountedPhone[]>(initialDiscountedPhones);
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
   const [banner, setBanner] = useState<Banner | null>(null);
+  const [banners, setBanners] = useState<Banner[]>([]);
 
   // Registrace účastníka: hashování hesla a uložení do DB
   const registerParticipant = async (userData: Omit<User, 'id' | 'progress' | 'visits' | 'visitedBooths' | 'password_hash'> & { password: string }) => {
@@ -453,7 +455,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const fetchBanner = async () => {
-    console.log('🔄 DataContext: Fetching active banner from Supabase...');
+    console.log('🔄 DataContext: Fetching active banners from Supabase...');
     const startTime = Date.now();
 
     // Check authentication status
@@ -469,12 +471,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const { data, error } = await supabase.from('banner').select('*').eq('is_active', true).single();
+      const { data, error } = await supabase.from('banner').select('*').eq('is_active', true);
       const fetchTime = Date.now() - startTime;
       console.log(`⏱️ DataContext: Banner fetch took ${fetchTime}ms`);
 
       if (error) {
-        console.error('❌ DataContext: Supabase error fetching banner:', {
+        console.error('❌ DataContext: Supabase error fetching banners:', {
           code: error.code,
           message: error.message,
           details: error.details,
@@ -487,45 +489,50 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           console.error('🌐 DataContext: Network error detected - possible connectivity issue after network change');
         } else if (error.message?.includes('timeout')) {
           console.error('⏰ DataContext: Timeout error - network may be slow or unreachable');
-        } else if (error.code === 'PGRST116') {
-          // No active banner found
-          console.log('ℹ️ DataContext: No active banner found (this is normal)');
-          setBanner(null);
         } else {
           console.error('❌ DataContext: Database or authentication error:', error);
         }
         return;
       }
 
-      if (data) {
-        console.log('✅ DataContext: Fetched active banner:', {
-          id: data.id,
-          text: data.text.substring(0, 50) + (data.text.length > 50 ? '...' : ''),
-          isActive: data.is_active,
-          targetAudience: data.target_audience,
-          createdAt: data.created_at,
-          createdBy: data.created_by,
-          fetchTime: `${fetchTime}ms`
+      if (data && data.length > 0) {
+        console.log('✅ DataContext: Fetched active banners:', data.length, 'banners');
+        data.forEach((banner, index) => {
+          console.log(`📢 Banner ${index + 1}:`, {
+            id: banner.id,
+            text: banner.text.substring(0, 50) + (banner.text.length > 50 ? '...' : ''),
+            isActive: banner.is_active,
+            targetAudience: banner.target_audience,
+            createdAt: banner.created_at,
+            createdBy: banner.created_by
+          });
         });
 
-        const bannerData = {
-          id: data.id,
-          text: data.text,
-          isActive: data.is_active,
-          targetAudience: data.target_audience || 'all',
-          createdAt: data.created_at,
-          createdBy: data.created_by
-        };
+        const bannerData = data.map((banner: any) => ({
+          id: banner.id,
+          text: banner.text,
+          isActive: banner.is_active,
+          targetAudience: banner.target_audience || 'all',
+          createdAt: banner.created_at,
+          createdBy: banner.created_by
+        }));
 
-        setBanner(bannerData);
-        console.log('✅ DataContext: Banner set in state successfully');
+        setBanners(bannerData);
+        console.log('✅ DataContext: Active banners set in state successfully');
+
+        // For backward compatibility, set the first banner as the main banner
+        if (bannerData.length > 0) {
+          setBanner(bannerData[0]);
+          console.log('✅ DataContext: Main banner set to first active banner');
+        }
       } else {
-        console.log('ℹ️ DataContext: No banner data returned from Supabase');
+        console.log('ℹ️ DataContext: No active banners found');
+        setBanners([]);
         setBanner(null);
       }
     } catch (error: any) {
       const fetchTime = Date.now() - startTime;
-      console.error('❌ DataContext: Unexpected error fetching banner:', {
+      console.error('❌ DataContext: Unexpected error fetching banners:', {
         error: error.message || error,
         stack: error.stack,
         fetchTime: `${fetchTime}ms`
@@ -540,6 +547,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         console.error('🌍 DataContext: DNS resolution error - network configuration issue');
       }
 
+      setBanners([]);
       setBanner(null);
     }
   };
@@ -991,6 +999,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             };
 
             console.log('✅ DataContext: Banner reactivated successfully:', updatedBanner);
+            // Update the banners array
+            setBanners(prev => prev.map(b => b.id === bannerId ? updatedBanner : b));
+            // For backward compatibility, set as main banner if it's the first one
             setBanner(updatedBanner);
             toast({ title: 'Banner aktivován', description: 'Banner byl úspěšně aktivován' });
           }
@@ -1065,6 +1076,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           };
 
           console.log('✅ DataContext: Banner updated successfully:', updatedBanner);
+          // Add to banners array
+          setBanners(prev => [...prev, updatedBanner]);
+          // For backward compatibility, set as main banner if it's the first one
           setBanner(updatedBanner);
           toast({ title: 'Banner aktivován', description: 'Banner byl úspěšně aktivován' });
         }
@@ -1087,6 +1101,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         }
 
         console.log('✅ DataContext: Banner deactivated');
+        // Remove from banners array
+        if (bannerId) {
+          setBanners(prev => prev.filter(b => b.id !== bannerId));
+        }
         // Refresh the active banner state
         await fetchBanner();
         toast({ title: 'Banner deaktivován', description: 'Banner byl úspěšně deaktivován' });
@@ -1113,6 +1131,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       winners,
       discountedPhones,
       notifications,
+      banners,
       banner,
       isLoading,
       setUsers,

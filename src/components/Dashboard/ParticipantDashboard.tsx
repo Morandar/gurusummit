@@ -20,7 +20,7 @@ interface ParticipantDashboardProps {
 }
 
 export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: ParticipantDashboardProps) => {
-  const { booths, program, users, visitBooth, isLoading, discountedPhones, banner } = useData();
+  const { booths, program, users, visitBooth, isLoading, discountedPhones, banners, banner } = useData();
   const [timeToNext, setTimeToNext] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [selectedBooth, setSelectedBooth] = useState<{ id: number; name: string } | null>(null);
@@ -214,8 +214,8 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
         </header>
 
         {/* Scrolling Banner */}
-        {banner && (banner.targetAudience === 'all' || banner.targetAudience === 'participants') && (
-          <ScrollingBanner banner={banner} />
+        {banners && banners.length > 0 && (
+          <ScrollingBanner banners={banners} />
         )}
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">

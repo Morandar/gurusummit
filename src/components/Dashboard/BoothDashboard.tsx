@@ -15,7 +15,7 @@ import { ScrollingBanner } from '@/components/ScrollingBanner';
 
 export const BoothDashboard = () => {
   const { user, logout } = useAuth();
-  const { booths, program, users, banner } = useData();
+  const { booths, program, users, banners, banner } = useData();
   const isLoading = false; // Temporary fix for TS cache issue
   // Pokud toast používáte, importujte useToast
   // import { useToast } from '@/hooks/use-toast';
@@ -163,8 +163,8 @@ export const BoothDashboard = () => {
          </div>
 
        {/* Scrolling Banner */}
-       {banner && (banner.targetAudience === 'all' || banner.targetAudience === 'booth_staff') && (
-         <ScrollingBanner banner={banner} />
+       {banners && banners.length > 0 && (
+         <ScrollingBanner banners={banners} />
        )}
 
        <Tabs defaultValue="code" className="space-y-6">
