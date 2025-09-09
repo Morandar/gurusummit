@@ -19,7 +19,7 @@ interface ParticipantDashboardProps {
 }
 
 export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: ParticipantDashboardProps) => {
-  const { booths, program, users, visitBooth, isLoading, discountedPhones, notifications } = useData();
+  const { booths, program, users, visitBooth, isLoading, discountedPhones, notifications, markNotificationAsRead } = useData();
   const [timeToNext, setTimeToNext] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [selectedBooth, setSelectedBooth] = useState<{ id: number; name: string } | null>(null);
@@ -143,7 +143,7 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
     notification.targetAudience === 'all' || notification.targetAudience === 'participants'
   );
 
-  const unreadNotificationsCount = userNotifications.filter(n => n.isActive).length;
+  const unreadNotificationsCount = userNotifications.filter(n => n.isActive && !n.isRead).length;
 
   // Debug logs for notifications
   console.log('🔔 ParticipantDashboard: Total notifications:', notifications.length);
@@ -239,9 +239,17 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                       ) : (
                         <div className="divide-y">
                           {userNotifications.map((notification) => (
-                            <div key={notification.id} className="p-4 hover:bg-muted/50">
+                            <div
+                              key={notification.id}
+                              className={`p-4 hover:bg-muted/50 cursor-pointer ${notification.isRead ? 'opacity-75' : ''}`}
+                              onClick={() => {
+                                if (!notification.isRead && currentUser) {
+                                  markNotificationAsRead(notification.id, currentUser.id);
+                                }
+                              }}
+                            >
                               <div className="flex items-start gap-3">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                                <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${notification.isRead ? 'bg-gray-400' : 'bg-blue-500'}`}></div>
                                 <div className="flex-1 min-w-0">
                                   <h4 className="font-medium text-sm">{notification.title}</h4>
                                   <p className="text-sm text-muted-foreground mt-1">
@@ -249,6 +257,7 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                                   </p>
                                   <p className="text-xs text-muted-foreground mt-2">
                                     {new Date(notification.createdAt).toLocaleString('cs-CZ')}
+                                    {notification.isRead && <span className="ml-2 text-xs">(přečteno)</span>}
                                   </p>
                                 </div>
                               </div>

@@ -52,12 +52,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const checkSession = async () => {
       setIsLoading(true);
       
-      // First check for participant user in localStorage
+      // First check for user in localStorage (participants and booths)
       try {
         const storedUser = localStorage.getItem('authUser');
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
-          if (parsedUser && parsedUser.type === 'participant') {
+          if (parsedUser && (parsedUser.type === 'participant' || parsedUser.type === 'booth')) {
             setUser(parsedUser);
             setIsLoading(false);
             return;
@@ -149,6 +149,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
 
         setUser(boothUser);
+        // Store booth user in localStorage for persistence
+        localStorage.setItem('authUser', JSON.stringify(boothUser));
         return true;
       }
 

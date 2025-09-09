@@ -14,7 +14,7 @@ import { useData } from '@/context/DataContext';
 
 export const BoothDashboard = () => {
   const { user, logout } = useAuth();
-  const { booths, program, users, notifications } = useData();
+  const { booths, program, users, notifications, markNotificationAsRead } = useData();
   const isLoading = false; // Temporary fix for TS cache issue
   // Pokud toast používáte, importujte useToast
   // import { useToast } from '@/hooks/use-toast';
@@ -119,7 +119,7 @@ export const BoothDashboard = () => {
     notification.targetAudience === 'all' || notification.targetAudience === 'booth_staff'
   );
 
-  const unreadNotificationsCount = boothNotifications.filter(n => n.isActive).length;
+  const unreadNotificationsCount = boothNotifications.filter(n => n.isActive && !n.isRead).length;
 
   useEffect(() => {
     const onFocus = () => {
@@ -190,9 +190,17 @@ export const BoothDashboard = () => {
                    ) : (
                      <div className="divide-y">
                        {boothNotifications.map((notification) => (
-                         <div key={notification.id} className="p-4 hover:bg-muted/50">
+                         <div
+                           key={notification.id}
+                           className={`p-4 hover:bg-muted/50 cursor-pointer ${notification.isRead ? 'opacity-75' : ''}`}
+                           onClick={() => {
+                             if (!notification.isRead && user) {
+                               markNotificationAsRead(notification.id, parseInt(user.id));
+                             }
+                           }}
+                         >
                            <div className="flex items-start gap-3">
-                             <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                             <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${notification.isRead ? 'bg-gray-400' : 'bg-blue-500'}`}></div>
                              <div className="flex-1 min-w-0">
                                <h4 className="font-medium text-sm">{notification.title}</h4>
                                <p className="text-sm text-muted-foreground mt-1">
@@ -200,6 +208,7 @@ export const BoothDashboard = () => {
                                </p>
                                <p className="text-xs text-muted-foreground mt-2">
                                  {new Date(notification.createdAt).toLocaleString('cs-CZ')}
+                                 {notification.isRead && <span className="ml-2 text-xs">(přečteno)</span>}
                                </p>
                              </div>
                            </div>

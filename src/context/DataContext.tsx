@@ -83,6 +83,7 @@ interface Notification {
   createdAt: string;
   createdBy: string;
   isActive: boolean;
+  isRead?: boolean;
 }
 
 interface DataContextType {
@@ -443,15 +444,24 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     const { data, error } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
     if (!error && data) {
       console.log('✅ DataContext: Fetched notifications:', data.length, 'notifications');
-      const mappedNotifications = data.map((notification: any) => ({
-        id: notification.id,
-        title: notification.title,
-        message: notification.message,
-        targetAudience: notification.target_audience,
-        createdAt: notification.created_at,
-        createdBy: notification.created_by,
-        isActive: notification.is_active
-      }));
+      const mappedNotifications = data.map((notification: any) => {
+        // Get current user ID to check read status
+        const currentUser = JSON.parse(localStorage.getItem('authUser') || '{}');
+        const userId = currentUser?.id || 'anonymous';
+        const readKey = `notification_read_${userId}_${notification.id}`;
+        const isRead = localStorage.getItem(readKey) === 'true';
+
+        return {
+          id: notification.id,
+          title: notification.title,
+          message: notification.message,
+          targetAudience: notification.target_audience,
+          createdAt: notification.created_at,
+          createdBy: notification.created_by,
+          isActive: notification.is_active,
+          isRead: isRead
+        };
+      });
       setNotifications(mappedNotifications);
     } else if (error) {
       console.error('❌ DataContext: Error fetching notifications:', error);
@@ -799,6 +809,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         console.log('✅ DataContext: Notification created successfully:', createdNotification);
         setNotifications(prev => [createdNotification, ...prev]);
         console.log('🔄 DataContext: Local notifications state updated');
+
+        // Refetch notifications to ensure all clients get the update
+        setTimeout(() => {
+          console.log('🔄 DataContext: Refetching notifications for real-time update');
+          fetchNotifications();
+        }, 1000);
       } else {
         console.warn('⚠️ DataContext: No data returned from notification creation');
       }
@@ -809,11 +825,22 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const markNotificationAsRead = async (notificationId: number, userId: number) => {
     try {
-      // This would typically update a user_notifications table
-      // For now, we'll just log it
-      console.log(`Notification ${notificationId} marked as read by user ${userId}`);
+      console.log(`🔔 DataContext: Marking notification ${notificationId} as read for user ${userId}`);
+
+      // Store read status in localStorage (keyed by userId and notificationId)
+      const readKey = `notification_read_${userId}_${notificationId}`;
+      localStorage.setItem(readKey, 'true');
+
+      // Update local state to reflect the read status
+      setNotifications(prev => prev.map(notification =>
+        notification.id === notificationId
+          ? { ...notification, isRead: true }
+          : notification
+      ));
+
+      console.log(`✅ DataContext: Notification ${notificationId} marked as read`);
     } catch (error) {
-      console.error('Mark notification as read error:', error);
+      console.error('❌ DataContext: Mark notification as read error:', error);
     }
   };
 
