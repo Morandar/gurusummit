@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { LogOut, Users, Building, Calendar, BarChart3, Download, RotateCcw, Plus, Edit, Trash2, Trophy, User, Image, Eye, Smartphone, Presentation, Coffee, Wrench, Users2, Award } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useData } from '@/context/DataContext';
+import { useData, Banner } from '@/context/DataContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -58,6 +58,14 @@ export const AdminDashboard = () => {
     discountedPrice: 0,
     description: ''
   });
+
+  // Banner form states
+  const [bannerForm, setBannerForm] = useState({
+    text: '',
+    targetAudience: 'all' as 'all' | 'participants' | 'booth_staff'
+  });
+  const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
+  const [bannerList, setBannerList] = useState<Banner[]>([]);
 
   
   // Local draft state for homepage texts
@@ -632,6 +640,69 @@ export const AdminDashboard = () => {
     toast({ title: 'Obrázek odstraněn', description: 'Profilový obrázek byl odstraněn' });
   };
 
+  // Banner handlers
+  const handleCreateBanner = async () => {
+    if (!bannerForm.text.trim()) {
+      toast({ title: 'Chyba', description: 'Zadejte text banneru' });
+      return;
+    }
+
+    try {
+      await updateBanner(bannerForm.text, true, bannerForm.targetAudience);
+      setBannerForm({ text: '', targetAudience: 'all' });
+      toast({ title: 'Banner vytvořen', description: 'Banner byl úspěšně vytvořen a aktivován' });
+    } catch (error) {
+      console.error('Create banner error:', error);
+      toast({ title: 'Chyba při vytváření banneru', description: 'Nastala neočekávaná chyba' });
+    }
+  };
+
+  const handleEditBanner = (banner: Banner) => {
+    setEditingBanner(banner);
+    setBannerForm({
+      text: banner.text,
+      targetAudience: banner.targetAudience
+    });
+  };
+
+  const handleSaveBannerEdit = async () => {
+    if (!editingBanner) return;
+
+    try {
+      await updateBanner(bannerForm.text, editingBanner.isActive, bannerForm.targetAudience);
+      setEditingBanner(null);
+      setBannerForm({ text: '', targetAudience: 'all' });
+      toast({ title: 'Banner upraven', description: 'Změny byly uloženy' });
+    } catch (error) {
+      console.error('Save banner edit error:', error);
+      toast({ title: 'Chyba při ukládání banneru', description: 'Nastala neočekávaná chyba' });
+    }
+  };
+
+  const handleDeleteBanner = async (bannerId: number) => {
+    try {
+      // For now, just deactivate the banner since we don't have a delete function
+      await updateBanner('', false);
+      toast({ title: 'Banner smazán', description: 'Banner byl deaktivován' });
+    } catch (error) {
+      console.error('Delete banner error:', error);
+      toast({ title: 'Chyba při mazání banneru', description: 'Nastala neočekávaná chyba' });
+    }
+  };
+
+  const handleToggleBanner = async (banner: Banner, isActive: boolean) => {
+    try {
+      await updateBanner(banner.text, isActive, banner.targetAudience);
+      toast({
+        title: isActive ? 'Banner aktivován' : 'Banner deaktivován',
+        description: `Banner byl ${isActive ? 'aktivován' : 'deaktivován'}`
+      });
+    } catch (error) {
+      console.error('Toggle banner error:', error);
+      toast({ title: 'Chyba při změně stavu banneru', description: 'Nastala neočekávaná chyba' });
+    }
+  };
+
   // Update draft texts and mark as unsaved
   const updateHomePageTextsDraft = (updates: Partial<typeof homePageTexts>) => {
     setHomePageTextsDraft(prev => ({ ...prev, ...updates }));
@@ -1200,13 +1271,20 @@ export const AdminDashboard = () => {
                   <Label htmlFor="banner-text">Text banneru</Label>
                   <Textarea
                     id="banner-text"
+                    value={bannerForm.text}
+                    onChange={(e) => setBannerForm(prev => ({ ...prev, text: e.target.value }))}
                     placeholder="Zadejte text banneru"
                     rows={3}
                   />
                 </div>
                 <div>
                   <Label htmlFor="target-audience">Cílová skupina</Label>
-                  <Select defaultValue="all">
+                  <Select
+                    value={bannerForm.targetAudience}
+                    onValueChange={(value: 'all' | 'participants' | 'booth_staff') =>
+                      setBannerForm(prev => ({ ...prev, targetAudience: value }))
+                    }
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Vyberte cílovou skupinu" />
                     </SelectTrigger>
@@ -1217,7 +1295,7 @@ export const AdminDashboard = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button className="w-full">
+                <Button className="w-full" onClick={handleCreateBanner}>
                   <Plus className="h-4 w-4 mr-2" />
                   Vytvořit banner
                 </Button>
@@ -1268,55 +1346,64 @@ export const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {/* Sample banner items - in real app this would be fetched from DB */}
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="font-medium">Vítejte na O2 Guru Summitu 2025!</div>
-                      <div className="text-sm text-muted-foreground">Cílová skupina: Všichni</div>
+                  {/* Active banner management */}
+                  {banner && (
+                    <div className="flex items-center justify-between p-4 border rounded-lg bg-green-50 border-green-200">
+                      <div className="flex-1">
+                        <div className="font-medium">{banner.text}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Cílová skupina: {banner.targetAudience === 'all' ? 'Všichni' :
+                                         banner.targetAudience === 'participants' ? 'Účastníci' : 'Stánkaři'}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={banner.isActive}
+                          onCheckedChange={(checked) => handleToggleBanner(banner, checked)}
+                        />
+                        <Button variant="outline" size="sm" onClick={() => handleEditBanner(banner)}>
+                          <Edit className="h-4 w-4 mr-1" />
+                          Upravit
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => handleDeleteBanner(banner.id)}>
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Smazat
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Switch defaultChecked={true} />
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4 mr-1" />
-                        Upravit
-                      </Button>
-                      <Button variant="destructive" size="sm">
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Smazat
-                      </Button>
-                    </div>
-                  </div>
+                  )}
 
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                  {/* Sample banner items for demonstration */}
+                  <div className="flex items-center justify-between p-4 border rounded-lg opacity-60">
                     <div className="flex-1">
                       <div className="font-medium">Workshop začíná za 15 minut!</div>
                       <div className="text-sm text-muted-foreground">Cílová skupina: Účastníci</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Switch defaultChecked={false} />
-                      <Button variant="outline" size="sm">
+                      <Switch disabled />
+                      <Button variant="outline" size="sm" disabled>
                         <Edit className="h-4 w-4 mr-1" />
                         Upravit
                       </Button>
-                      <Button variant="destructive" size="sm">
+                      <Button variant="destructive" size="sm" disabled>
                         <Trash2 className="h-4 w-4 mr-1" />
                         Smazat
                       </Button>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center justify-between p-4 border rounded-lg opacity-60">
                     <div className="flex-1">
                       <div className="font-medium">Připravte se na losování cen!</div>
                       <div className="text-sm text-muted-foreground">Cílová skupina: Stánkaři</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Switch defaultChecked={false} />
-                      <Button variant="outline" size="sm">
+                      <Switch disabled />
+                      <Button variant="outline" size="sm" disabled>
                         <Edit className="h-4 w-4 mr-1" />
                         Upravit
                       </Button>
-                      <Button variant="destructive" size="sm">
+                      <Button variant="destructive" size="sm" disabled>
                         <Trash2 className="h-4 w-4 mr-1" />
                         Smazat
                       </Button>
@@ -2143,6 +2230,60 @@ export const AdminDashboard = () => {
           currentImage={imageUploadModal.currentImage}
         />
       )}
+
+      {/* Edit Banner Dialog */}
+      <Dialog open={editingBanner !== null} onOpenChange={(open) => {
+        if (!open) {
+          setEditingBanner(null);
+          setBannerForm({ text: '', targetAudience: 'all' });
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upravit banner</DialogTitle>
+            <DialogDescription>Změňte text a cílovou skupinu banneru</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-banner-text" className="text-right">Text banneru</Label>
+              <Textarea
+                id="edit-banner-text"
+                value={bannerForm.text}
+                onChange={(e) => setBannerForm(prev => ({ ...prev, text: e.target.value }))}
+                className="col-span-3"
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-target-audience" className="text-right">Cílová skupina</Label>
+              <Select
+                value={bannerForm.targetAudience}
+                onValueChange={(value: 'all' | 'participants' | 'booth_staff') =>
+                  setBannerForm(prev => ({ ...prev, targetAudience: value }))
+                }
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Vyberte cílovou skupinu" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Všichni uživatelé</SelectItem>
+                  <SelectItem value="participants">Jen účastníci</SelectItem>
+                  <SelectItem value="booth_staff">Jen stánkaři</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setEditingBanner(null);
+              setBannerForm({ text: '', targetAudience: 'all' });
+            }}>
+              Zrušit
+            </Button>
+            <Button onClick={handleSaveBannerEdit}>Uložit změny</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
