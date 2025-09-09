@@ -126,7 +126,7 @@ interface DataContextType {
   addUserByAdmin: (userData: { personalNumber: string; firstName: string; lastName: string; position: string; password?: string }) => Promise<boolean>;
   createNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => Promise<void>;
   markNotificationAsRead: (notificationId: number, userId: number) => Promise<void>;
-  updateBanner: (text: string, isActive: boolean, targetAudience?: 'all' | 'participants' | 'booth_staff') => Promise<void>;
+  updateBanner: (text: string, isActive: boolean, targetAudience?: 'all' | 'participants' | 'booth_staff', bannerId?: number) => Promise<void>;
   fetchAllBanners: () => Promise<Banner[]>;
 }
 
@@ -957,11 +957,47 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateBanner = async (text: string, isActive: boolean, targetAudience: 'all' | 'participants' | 'booth_staff' = 'all') => {
-    console.log('📢 DataContext: Updating banner:', { text, isActive, targetAudience });
+  const updateBanner = async (text: string, isActive: boolean, targetAudience: 'all' | 'participants' | 'booth_staff' = 'all', bannerId?: number) => {
+    console.log('📢 DataContext: Updating banner:', { text, isActive, targetAudience, bannerId });
     try {
       if (isActive && text.trim()) {
-        // First, try to find existing banner with same text and target audience
+        // If we have a bannerId, use it to update the specific banner
+        if (bannerId) {
+          console.log('🔄 DataContext: Reactivating existing banner by ID:', bannerId);
+          const { data, error } = await supabase
+            .from('banner')
+            .update({
+              is_active: true,
+              created_at: new Date().toISOString() // Update timestamp
+            })
+            .eq('id', bannerId)
+            .select()
+            .single();
+
+          if (error) {
+            console.error('❌ DataContext: Error reactivating banner by ID:', error);
+            toast({ title: 'Chyba při reaktivaci banneru', description: error.message });
+            return;
+          }
+
+          if (data) {
+            const updatedBanner: Banner = {
+              id: data.id,
+              text: data.text,
+              isActive: data.is_active,
+              targetAudience: data.target_audience,
+              createdAt: data.created_at,
+              createdBy: data.created_by
+            };
+
+            console.log('✅ DataContext: Banner reactivated successfully:', updatedBanner);
+            setBanner(updatedBanner);
+            toast({ title: 'Banner aktivován', description: 'Banner byl úspěšně aktivován' });
+          }
+          return;
+        }
+
+        // Fallback: try to find existing banner with same text and target audience
         const { data: existingBanner, error: findError } = await supabase
           .from('banner')
           .select('*')
@@ -997,7 +1033,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           }
           result = data;
         } else {
-          // Create new banner
+          // Create new banner only if explicitly requested (no bannerId provided)
           console.log('➕ DataContext: Creating new banner');
           const { data, error } = await supabase
             .from('banner')
@@ -1033,12 +1069,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           toast({ title: 'Banner aktivován', description: 'Banner byl úspěšně aktivován' });
         }
       } else {
-        // Deactivate specific banner by text and target audience
-        const { error } = await supabase
-          .from('banner')
-          .update({ is_active: false })
-          .eq('text', text.trim())
-          .eq('target_audience', targetAudience);
+        // Deactivate specific banner by ID if provided, otherwise by text and target audience
+        let query = supabase.from('banner').update({ is_active: false });
+
+        if (bannerId) {
+          query = query.eq('id', bannerId);
+        } else {
+          query = query.eq('text', text.trim()).eq('target_audience', targetAudience);
+        }
+
+        const { error } = await query;
 
         if (error) {
           console.error('❌ DataContext: Error deactivating banner:', error);

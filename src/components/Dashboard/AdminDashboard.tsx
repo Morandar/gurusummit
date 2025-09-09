@@ -726,7 +726,7 @@ export const AdminDashboard = () => {
       toActive: isActive
     });
     try {
-      await updateBanner(banner.text, isActive, banner.targetAudience);
+      await updateBanner(banner.text, isActive, banner.targetAudience, banner.id);
       console.log('✅ AdminDashboard: Banner toggle successful');
       toast({
         title: isActive ? 'Banner aktivován' : 'Banner deaktivován',
