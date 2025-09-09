@@ -59,6 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const parsedUser = JSON.parse(storedUser);
           if (parsedUser && (parsedUser.type === 'participant' || parsedUser.type === 'booth')) {
             setUser(parsedUser);
+            // Store in window for DataContext access
+            (window as any).__authUser = parsedUser;
             setIsLoading(false);
             return;
           }
@@ -149,8 +151,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
 
         setUser(boothUser);
-        // Store booth user in localStorage for persistence
+        // Store booth user in localStorage and window for persistence
         localStorage.setItem('authUser', JSON.stringify(boothUser));
+        (window as any).__authUser = boothUser;
         return true;
       }
 
@@ -181,6 +184,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             position: (foundUser as any).position,
           };
           setUser(participantUser);
+          // Store participant user in localStorage and window
+          localStorage.setItem('authUser', JSON.stringify(participantUser));
+          (window as any).__authUser = participantUser;
           return true;
         }
 
@@ -209,6 +215,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             position: inserted?.position || position,
           };
           setUser(participantUser);
+          // Store participant user in localStorage and window
+          localStorage.setItem('authUser', JSON.stringify(participantUser));
+          (window as any).__authUser = participantUser;
           return true;
         }
 
