@@ -961,37 +961,76 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     console.log('📢 DataContext: Updating banner:', { text, isActive, targetAudience });
     try {
       if (isActive && text.trim()) {
-        // Create or update active banner
-        const { data, error } = await supabase
+        // First, try to find existing banner with same text and target audience
+        const { data: existingBanner, error: findError } = await supabase
           .from('banner')
-          .upsert([{
-            text: text.trim(),
-            is_active: true,
-            target_audience: targetAudience,
-            created_by: 'admin',
-            created_at: new Date().toISOString()
-          }])
-          .select();
+          .select('*')
+          .eq('text', text.trim())
+          .eq('target_audience', targetAudience)
+          .single();
 
-        if (error) {
-          console.error('❌ DataContext: Error updating banner:', error);
-          toast({ title: 'Chyba při aktualizaci banneru', description: error.message });
+        if (findError && findError.code !== 'PGRST116') {
+          // Error other than "not found"
+          console.error('❌ DataContext: Error finding existing banner:', findError);
+          toast({ title: 'Chyba při hledání banneru', description: findError.message });
           return;
         }
 
-        if (data && data[0]) {
+        let result;
+        if (existingBanner) {
+          // Update existing banner to active
+          console.log('🔄 DataContext: Reactivating existing banner:', existingBanner.id);
+          const { data, error } = await supabase
+            .from('banner')
+            .update({
+              is_active: true,
+              created_at: new Date().toISOString() // Update timestamp
+            })
+            .eq('id', existingBanner.id)
+            .select()
+            .single();
+
+          if (error) {
+            console.error('❌ DataContext: Error reactivating banner:', error);
+            toast({ title: 'Chyba při reaktivaci banneru', description: error.message });
+            return;
+          }
+          result = data;
+        } else {
+          // Create new banner
+          console.log('➕ DataContext: Creating new banner');
+          const { data, error } = await supabase
+            .from('banner')
+            .insert([{
+              text: text.trim(),
+              is_active: true,
+              target_audience: targetAudience,
+              created_by: 'admin'
+            }])
+            .select()
+            .single();
+
+          if (error) {
+            console.error('❌ DataContext: Error creating banner:', error);
+            toast({ title: 'Chyba při vytváření banneru', description: error.message });
+            return;
+          }
+          result = data;
+        }
+
+        if (result) {
           const updatedBanner: Banner = {
-            id: data[0].id,
-            text: data[0].text,
-            isActive: data[0].is_active,
-            targetAudience: data[0].target_audience,
-            createdAt: data[0].created_at,
-            createdBy: data[0].created_by
+            id: result.id,
+            text: result.text,
+            isActive: result.is_active,
+            targetAudience: result.target_audience,
+            createdAt: result.created_at,
+            createdBy: result.created_by
           };
 
           console.log('✅ DataContext: Banner updated successfully:', updatedBanner);
           setBanner(updatedBanner);
-          toast({ title: 'Banner aktualizován', description: 'Banner byl úspěšně aktualizován' });
+          toast({ title: 'Banner aktivován', description: 'Banner byl úspěšně aktivován' });
         }
       } else {
         // Deactivate specific banner by text and target audience
