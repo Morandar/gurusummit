@@ -43,6 +43,7 @@ interface ProgramEvent {
   time: string;
   event: string;
   duration: number;
+  category?: string;
 }
 
 interface CodeTimeSettings {
@@ -74,6 +75,16 @@ interface DiscountedPhone {
   description?: string;
 }
 
+interface Notification {
+  id: number;
+  title: string;
+  message: string;
+  targetAudience: 'all' | 'participants' | 'booth_staff';
+  createdAt: string;
+  createdBy: string;
+  isActive: boolean;
+}
+
 interface DataContextType {
   users: User[];
   booths: Booth[];
@@ -82,6 +93,7 @@ interface DataContextType {
   homePageTexts: HomePageTexts;
   winners: Winner[];
   discountedPhones: DiscountedPhone[];
+  notifications: Notification[];
   isLoading: boolean;
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   setBooths: React.Dispatch<React.SetStateAction<Booth[]>>;
@@ -90,6 +102,7 @@ interface DataContextType {
   setHomePageTexts: React.Dispatch<React.SetStateAction<HomePageTexts>>;
   setWinners: React.Dispatch<React.SetStateAction<Winner[]>>;
   setDiscountedPhones: React.Dispatch<React.SetStateAction<DiscountedPhone[]>>;
+  setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
   visitBooth: (userId: number, boothId: number) => Promise<void>;
   getUserProgress: (userId: number) => number;
   resetAllProgress: () => void;
@@ -100,6 +113,8 @@ interface DataContextType {
   registerParticipant: (userData: Omit<User, 'id' | 'progress' | 'visits' | 'visitedBooths' | 'password_hash'> & { password: string }) => Promise<boolean>;
   loginParticipant: (personalNumber: string, password: string) => Promise<User | null>;
   addUserByAdmin: (userData: { personalNumber: string; firstName: string; lastName: string; position: string; password?: string }) => Promise<boolean>;
+  createNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => Promise<void>;
+  markNotificationAsRead: (notificationId: number, userId: number) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -116,6 +131,8 @@ const initialProgram: ProgramEvent[] = [];
 const initialWinners: Winner[] = [];
 
 const initialDiscountedPhones: DiscountedPhone[] = [];
+
+const initialNotifications: Notification[] = [];
 
 const initialCodeTimeSettings: CodeTimeSettings = {
   startTime: '09:00',
@@ -200,6 +217,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [homePageTexts, setHomePageTextsState] = useState<HomePageTexts>(initialHomePageTexts);
   const [winners, setWinnersState] = useState<Winner[]>([]);
   const [discountedPhones, setDiscountedPhones] = useState<DiscountedPhone[]>(initialDiscountedPhones);
+  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
 
   // Registrace účastníka: hashování hesla a uložení do DB
   const registerParticipant = async (userData: Omit<User, 'id' | 'progress' | 'visits' | 'visitedBooths' | 'password_hash'> & { password: string }) => {
@@ -707,6 +725,57 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }));
   }, [booths.length]);
 
+  const createNotification = async (notification: Omit<Notification, 'id' | 'createdAt'>) => {
+    try {
+      const newNotification = {
+        ...notification,
+        createdAt: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert([{
+          title: newNotification.title,
+          message: newNotification.message,
+          target_audience: newNotification.targetAudience,
+          created_by: newNotification.createdBy,
+          is_active: newNotification.isActive
+        }])
+        .select();
+
+      if (error) {
+        console.error('Error creating notification:', error);
+        return;
+      }
+
+      if (data && data[0]) {
+        const createdNotification: Notification = {
+          id: data[0].id,
+          title: data[0].title,
+          message: data[0].message,
+          targetAudience: data[0].target_audience,
+          createdAt: data[0].created_at,
+          createdBy: data[0].created_by,
+          isActive: data[0].is_active
+        };
+
+        setNotifications(prev => [createdNotification, ...prev]);
+      }
+    } catch (error) {
+      console.error('Create notification error:', error);
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId: number, userId: number) => {
+    try {
+      // This would typically update a user_notifications table
+      // For now, we'll just log it
+      console.log(`Notification ${notificationId} marked as read by user ${userId}`);
+    } catch (error) {
+      console.error('Mark notification as read error:', error);
+    }
+  };
+
 
 
 
@@ -721,6 +790,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       homePageTexts,
       winners,
       discountedPhones,
+      notifications,
       isLoading,
       setUsers,
       setBooths,
@@ -729,6 +799,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       setHomePageTexts,
       setWinners,
       setDiscountedPhones,
+      setNotifications,
       visitBooth,
       getUserProgress,
       resetAllProgress,
@@ -739,6 +810,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       registerParticipant,
       loginParticipant,
       addUserByAdmin,
+      createNotification,
+      markNotificationAsRead,
     }}>
       {children}
     </DataContext.Provider>

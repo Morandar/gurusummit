@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, Users, Building, Calendar, BarChart3, Download, RotateCcw, Plus, Edit, Trash2, Trophy, User, Image, Eye, Smartphone } from 'lucide-react';
+import { LogOut, Users, Building, Calendar, BarChart3, Download, RotateCcw, Plus, Edit, Trash2, Trophy, User, Image, Eye, Smartphone, Presentation, Coffee, Wrench, Users2, Award } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LotteryWheel } from './LotteryWheel';
 import { WinnersModal } from './WinnersModal';
 import { ImageUploadModal } from '@/components/Modals/ImageUploadModal';
@@ -23,9 +24,9 @@ import { Textarea } from '@/components/ui/textarea';
 export const AdminDashboard = () => {
   const { logout } = useAuth();
   const {
-    users, booths, program, codeTimeSettings, homePageTexts, winners, discountedPhones,
-    setUsers, setBooths, setProgram, setCodeTimeSettings, setHomePageTexts, setDiscountedPhones,
-    resetAllProgress, removeUserProfileImage, addUserByAdmin
+    users, booths, program, codeTimeSettings, homePageTexts, winners, discountedPhones, notifications,
+    setUsers, setBooths, setProgram, setCodeTimeSettings, setHomePageTexts, setDiscountedPhones, setNotifications,
+    resetAllProgress, removeUserProfileImage, addUserByAdmin, createNotification
   } = useData();
   const isLoading = false; // Temporary fix for TS cache issue
   const { toast } = useToast();
@@ -47,7 +48,7 @@ export const AdminDashboard = () => {
   // Form states
   const [userForm, setUserForm] = useState({ firstName: '', lastName: '', personalNumber: '', position: '' });
   const [boothForm, setBoothForm] = useState({ name: '', code: '', login: '', category: '', password: '', logo: '' });
-  const [eventForm, setEventForm] = useState({ time: '', event: '', duration: 30 });
+  const [eventForm, setEventForm] = useState({ time: '', event: '', duration: 30, category: 'lecture' });
   const [phoneForm, setPhoneForm] = useState({
     manufacturerName: '',
     phoneModel: '',
@@ -56,6 +57,12 @@ export const AdminDashboard = () => {
     originalPrice: 0,
     discountedPrice: 0,
     description: ''
+  });
+
+  const [notificationForm, setNotificationForm] = useState({
+    title: '',
+    message: '',
+    targetAudience: 'all' as 'all' | 'participants' | 'booth_staff'
   });
   
   // Local draft state for homepage texts
@@ -112,6 +119,23 @@ export const AdminDashboard = () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getCategoryInfo = (category: string) => {
+    switch (category) {
+      case 'lecture':
+        return { icon: Presentation, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' };
+      case 'break':
+        return { icon: Coffee, color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' };
+      case 'workshop':
+        return { icon: Wrench, color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' };
+      case 'networking':
+        return { icon: Users2, color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' };
+      case 'ceremony':
+        return { icon: Award, color: 'text-yellow-600', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-200' };
+      default:
+        return { icon: Calendar, color: 'text-gray-600', bgColor: 'bg-gray-50', borderColor: 'border-gray-200' };
+    }
   };
 
   // Export functions
@@ -247,7 +271,7 @@ export const AdminDashboard = () => {
   };
 
   const handleEditEvent = (event: any) => {
-    setEventForm({ time: event.time, event: event.event, duration: event.duration });
+    setEventForm({ time: event.time, event: event.event, duration: event.duration, category: event.category || 'lecture' });
     setEditEventDialog({ open: true, event });
   };
 
@@ -361,7 +385,8 @@ export const AdminDashboard = () => {
           .update({
             time: eventForm.time,
             event: eventForm.event,
-            duration: eventForm.duration
+            duration: eventForm.duration,
+            category: eventForm.category
           })
           .eq('id', editEventDialog.event.id);
 
@@ -388,7 +413,8 @@ export const AdminDashboard = () => {
             id: newId,
             time: eventForm.time,
             event: eventForm.event,
-            duration: eventForm.duration
+            duration: eventForm.duration,
+            category: eventForm.category
           }])
           .select();
 
@@ -413,7 +439,7 @@ export const AdminDashboard = () => {
 
       setEditEventDialog({ open: false, event: null });
       setAddEventDialog(false);
-      setEventForm({ time: '', event: '', duration: 30 });
+      setEventForm({ time: '', event: '', duration: 30, category: 'lecture' });
     } catch (error) {
       console.error('Save event error:', error);
       toast({ title: 'Chyba při ukládání události', description: 'Nastala neočekávaná chyba' });
@@ -525,6 +551,33 @@ export const AdminDashboard = () => {
       console.error('Delete phone error:', error);
       toast({
         title: 'Chyba při mazání telefonu',
+        description: 'Nastala neočekávaná chyba',
+      });
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: number) => {
+    try {
+      // Delete from Supabase first
+      const { error } = await supabase.from('program').delete().eq('id', eventId);
+      if (error) {
+        toast({
+          title: 'Chyba při mazání události',
+          description: error.message,
+        });
+        return;
+      }
+
+      // Update local state only if database delete succeeded
+      setProgram(prev => prev.filter(event => event.id !== eventId));
+      toast({
+        title: 'Událost smazána',
+        description: 'Událost byla úspěšně odstraněna',
+      });
+    } catch (error) {
+      console.error('Delete event error:', error);
+      toast({
+        title: 'Chyba při mazání události',
         description: 'Nastala neočekávaná chyba',
       });
     }
@@ -674,11 +727,12 @@ export const AdminDashboard = () => {
         </div>
 
         <Tabs defaultValue="users" className="space-y-6">
-           <TabsList className="grid w-full grid-cols-6">
+           <TabsList className="grid w-full grid-cols-7">
              <TabsTrigger value="users">Účastníci</TabsTrigger>
              <TabsTrigger value="booths">Stánky</TabsTrigger>
              <TabsTrigger value="program">Program</TabsTrigger>
              <TabsTrigger value="phones">Zlevněné telefony</TabsTrigger>
+             <TabsTrigger value="notifications">Upozornění</TabsTrigger>
              <TabsTrigger value="settings">Nastavení</TabsTrigger>
              <TabsTrigger value="actions">Akce</TabsTrigger>
            </TabsList>
@@ -956,27 +1010,37 @@ export const AdminDashboard = () => {
                     const isActive = currentTime >= itemTime && currentTime < itemEndTime;
                     const isPast = currentTime >= itemEndTime;
 
+                    const categoryInfo = getCategoryInfo(item.category || 'lecture');
+                    const CategoryIcon = categoryInfo.icon;
+
                     return (
                       <div
                         key={item.id}
                         className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
-                          isActive 
-                            ? 'bg-primary/10 border border-primary/20' 
-                            : isPast 
-                            ? 'bg-muted/30' 
-                            : 'bg-card border'
+                          isActive
+                            ? 'bg-primary/10 border border-primary/20'
+                            : isPast
+                            ? 'bg-muted/30'
+                            : `${categoryInfo.bgColor} ${categoryInfo.borderColor} border`
                         }`}
                       >
                         <div className="flex items-center gap-4">
                           <Badge variant={isActive ? 'default' : isPast ? 'secondary' : 'outline'}>
                             {item.time}
                           </Badge>
+                          <div className={`p-2 rounded-full ${categoryInfo.bgColor}`}>
+                            <CategoryIcon className={`h-4 w-4 ${categoryInfo.color}`} />
+                          </div>
                           <div>
                             <div className={`font-medium ${isPast ? 'line-through text-muted-foreground' : ''}`}>
                               {item.event}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {item.duration} minut
+                              {item.duration} minut • {item.category === 'lecture' ? 'Přednáška' :
+                                                    item.category === 'break' ? 'Pauza' :
+                                                    item.category === 'workshop' ? 'Workshop' :
+                                                    item.category === 'networking' ? 'Networking' :
+                                                    item.category === 'ceremony' ? 'Ceremoniál' : 'Událost'}
                             </div>
                           </div>
                         </div>
@@ -988,6 +1052,28 @@ export const AdminDashboard = () => {
                             <Edit className="h-4 w-4 mr-1" />
                             Upravit
                           </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm">
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Smazat
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Smazat událost?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Opravdu chcete smazat událost "{item.event}"? Tato akce je nevratná.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Zrušit</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteEvent(item.id)}>
+                                  Smazat
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
                     );
@@ -1098,6 +1184,117 @@ export const AdminDashboard = () => {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Notifications Tab */}
+          <TabsContent value="notifications" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Správa upozornění</h3>
+              <Button onClick={() => setNotificationForm({ title: '', message: '', targetAudience: 'all' })}>
+                <Plus className="h-4 w-4 mr-2" />
+                Vytvořit upozornění
+              </Button>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Vytvořit nové upozornění</CardTitle>
+                <CardDescription>
+                  Odešlete upozornění všem uživatelům, jen účastníkům nebo jen stánkařům
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="notification-title">Nadpis</Label>
+                  <Input
+                    id="notification-title"
+                    value={notificationForm.title}
+                    onChange={(e) => setNotificationForm(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Zadejte nadpis upozornění"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="notification-message">Zpráva</Label>
+                  <Textarea
+                    id="notification-message"
+                    value={notificationForm.message}
+                    onChange={(e) => setNotificationForm(prev => ({ ...prev, message: e.target.value }))}
+                    placeholder="Zadejte text upozornění"
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="notification-audience">Cílová skupina</Label>
+                  <Select
+                    value={notificationForm.targetAudience}
+                    onValueChange={(value: 'all' | 'participants' | 'booth_staff') =>
+                      setNotificationForm(prev => ({ ...prev, targetAudience: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vyberte cílovou skupinu" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Všichni uživatelé</SelectItem>
+                      <SelectItem value="participants">Jen účastníci</SelectItem>
+                      <SelectItem value="booth_staff">Jen stánkaři</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  onClick={async () => {
+                    if (notificationForm.title && notificationForm.message) {
+                      await createNotification({
+                        title: notificationForm.title,
+                        message: notificationForm.message,
+                        targetAudience: notificationForm.targetAudience,
+                        createdBy: 'admin',
+                        isActive: true
+                      });
+                      setNotificationForm({ title: '', message: '', targetAudience: 'all' });
+                      toast({ title: 'Upozornění odesláno', description: 'Upozornění bylo úspěšně odesláno' });
+                    }
+                  }}
+                  disabled={!notificationForm.title || !notificationForm.message}
+                >
+                  Odeslat upozornění
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Odeslaná upozornění</CardTitle>
+                <CardDescription>
+                  Historie odeslaných upozornění
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {notifications.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">
+                    Žádná upozornění nebyla dosud odeslána
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {notifications.map((notification) => (
+                      <div key={notification.id} className="border rounded-lg p-3">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-medium">{notification.title}</h4>
+                          <Badge variant="outline">
+                            {notification.targetAudience === 'all' ? 'Všichni' :
+                             notification.targetAudience === 'participants' ? 'Účastníci' : 'Stánkaři'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-2">{notification.message}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(notification.createdAt).toLocaleString('cs-CZ')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Settings Tab */}
@@ -1624,6 +1821,24 @@ export const AdminDashboard = () => {
                   className="col-span-3"
                 />
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="event-category" className="text-right">Kategorie</Label>
+                <Select
+                  value={eventForm.category}
+                  onValueChange={(value) => setEventForm(prev => ({ ...prev, category: value }))}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Vyberte kategorii" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="lecture">Přednáška</SelectItem>
+                    <SelectItem value="break">Pauza</SelectItem>
+                    <SelectItem value="workshop">Workshop</SelectItem>
+                    <SelectItem value="networking">Networking</SelectItem>
+                    <SelectItem value="ceremony">Ceremoniál</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditEventDialog({ open: false, event: null })}>
@@ -1670,6 +1885,24 @@ export const AdminDashboard = () => {
                   onChange={(e) => setEventForm(prev => ({ ...prev, duration: parseInt(e.target.value) }))}
                   className="col-span-3"
                 />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="add-event-category" className="text-right">Kategorie</Label>
+                <Select
+                  value={eventForm.category}
+                  onValueChange={(value) => setEventForm(prev => ({ ...prev, category: value }))}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Vyberte kategorii" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="lecture">Přednáška</SelectItem>
+                    <SelectItem value="break">Pauza</SelectItem>
+                    <SelectItem value="workshop">Workshop</SelectItem>
+                    <SelectItem value="networking">Networking</SelectItem>
+                    <SelectItem value="ceremony">Ceremoniál</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <DialogFooter>

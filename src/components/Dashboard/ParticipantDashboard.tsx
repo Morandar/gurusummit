@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { BoothCodeModal } from '@/components/Modals/BoothCodeModal';
 import { ProfileEditModal } from '@/components/Profile/ProfileEditModal';
-import { Clock, MapPin, Trophy, Calendar, Smartphone, Lock, User, DollarSign, Star, Award } from 'lucide-react';
+import { Clock, MapPin, Trophy, Calendar, Smartphone, Lock, User, DollarSign, Star, Award, Bell } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 
 interface ParticipantDashboardProps {
@@ -17,7 +17,7 @@ interface ParticipantDashboardProps {
 }
 
 export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: ParticipantDashboardProps) => {
-  const { booths, program, users, visitBooth, isLoading, discountedPhones } = useData();
+  const { booths, program, users, visitBooth, isLoading, discountedPhones, notifications } = useData();
   const [timeToNext, setTimeToNext] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [selectedBooth, setSelectedBooth] = useState<{ id: number; name: string } | null>(null);
@@ -173,8 +173,8 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={currentUser?.profileImage} />
                     <AvatarFallback className="text-xs">
-                      {user.firstName && user.lastName ? 
-                        `${user.firstName[0]}${user.lastName[0]}` : 
+                      {user.firstName && user.lastName ?
+                        `${user.firstName[0]}${user.lastName[0]}` :
                         <User className="h-4 w-4" />
                       }
                     </AvatarFallback>
@@ -183,6 +183,16 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                     {user.firstName} {user.lastName}
                   </span>
                 </div>
+                {notifications.length > 0 && (
+                  <div className="relative">
+                    <Bell className="h-5 w-5 text-muted-foreground cursor-pointer hover:text-primary" />
+                    {notifications.filter(n => n.isActive).length > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                        {notifications.filter(n => n.isActive).length}
+                      </span>
+                    )}
+                  </div>
+                )}
                 {onUserUpdate && (
                   <ProfileEditModal user={user} onUserUpdate={onUserUpdate} />
                 )}
