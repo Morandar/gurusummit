@@ -1182,16 +1182,17 @@ export const AdminDashboard = () => {
           </TabsContent>
 
           {/* Banner Tab */}
-          <TabsContent value="banner" className="space-y-4">
+          <TabsContent value="banner" className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold">Správa banneru</h3>
             </div>
 
+            {/* Create Banner Section */}
             <Card>
               <CardHeader>
-                <CardTitle>Správa posuvného banneru</CardTitle>
+                <CardTitle>Vytvořit nový banner</CardTitle>
                 <CardDescription>
-                  Vytvořte nebo upravte banner, který se zobrazuje všem uživatelům
+                  Vytvořte banner, který se bude zobrazovat uživatelům
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1199,79 +1200,135 @@ export const AdminDashboard = () => {
                   <Label htmlFor="banner-text">Text banneru</Label>
                   <Textarea
                     id="banner-text"
-                    value={banner?.text || ''}
-                    onChange={(e) => {
-                      const text = e.target.value;
-                      if (banner) {
-                        updateBanner(text, banner.isActive);
-                      } else if (text.trim()) {
-                        updateBanner(text, true);
-                      }
-                    }}
                     placeholder="Zadejte text banneru"
                     rows={3}
                   />
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    checked={banner?.isActive || false}
-                    onCheckedChange={(checked) => {
-                      const text = banner?.text || '';
-                      if (checked && !text.trim()) {
-                        toast({ title: 'Chyba', description: 'Nejdříve zadejte text banneru' });
-                        return;
-                      }
-                      updateBanner(text, checked);
-                    }}
-                  />
-                  <Label>Aktivovat banner</Label>
+                <div>
+                  <Label htmlFor="target-audience">Cílová skupina</Label>
+                  <Select defaultValue="all">
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vyberte cílovou skupinu" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Všichni uživatelé</SelectItem>
+                      <SelectItem value="participants">Jen účastníci</SelectItem>
+                      <SelectItem value="booth_staff">Jen stánkaři</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                {banner && (
-                  <div className="mt-4 p-4 bg-muted rounded-lg">
-                    <h4 className="font-medium mb-2">Náhled banneru:</h4>
-                    <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded shadow-lg">
-                      <div className="max-w-7xl mx-auto">
-                        <div className="overflow-hidden whitespace-nowrap">
-                          <div className="inline-block text-sm font-medium">
-                            📢 {banner.text} 📢 {banner.text} 📢 {banner.text}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <Button className="w-full">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Vytvořit banner
+                </Button>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Informace o banneru</CardTitle>
-                <CardDescription>
-                  Aktuální stav banneru
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {banner ? (
+            {/* Active Banner Preview */}
+            {banner && (
+              <Card className="border-green-200 bg-green-50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-green-800">
+                    <Eye className="h-5 w-5" />
+                    Aktivní banner
+                  </CardTitle>
+                  <CardDescription className="text-green-700">
+                    Tento banner se právě zobrazuje uživatelům
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
                   <div className="space-y-3">
+                    <div className="p-3 bg-white rounded border">
+                      <div className="text-sm text-muted-foreground mb-1">Text:</div>
+                      <div className="font-medium">{banner.text}</div>
+                    </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Status:</span>
-                      <Badge variant={banner.isActive ? 'default' : 'secondary'}>
-                        {banner.isActive ? 'Aktivní' : 'Neaktivní'}
+                      <span className="text-sm text-muted-foreground">Cílová skupina:</span>
+                      <Badge variant="outline">
+                        {banner.targetAudience === 'all' ? 'Všichni' :
+                         banner.targetAudience === 'participants' ? 'Účastníci' : 'Stánkaři'}
                       </Badge>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Vytvořeno:</span>
                       <span className="text-sm">{new Date(banner.createdAt).toLocaleString('cs-CZ')}</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Vytvořil:</span>
-                      <span className="text-sm">{banner.createdBy}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Banner Management Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Správa bannerů</CardTitle>
+                <CardDescription>
+                  Aktivujte, deaktivujte nebo smažte existující bannery
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Sample banner items - in real app this would be fetched from DB */}
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="font-medium">Vítejte na O2 Guru Summitu 2025!</div>
+                      <div className="text-sm text-muted-foreground">Cílová skupina: Všichni</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch defaultChecked={true} />
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-4 w-4 mr-1" />
+                        Upravit
+                      </Button>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Smazat
+                      </Button>
                     </div>
                   </div>
-                ) : (
-                  <p className="text-muted-foreground text-center py-4">
-                    Žádný banner nebyl dosud vytvořen
-                  </p>
+
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="font-medium">Workshop začíná za 15 minut!</div>
+                      <div className="text-sm text-muted-foreground">Cílová skupina: Účastníci</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch defaultChecked={false} />
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-4 w-4 mr-1" />
+                        Upravit
+                      </Button>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Smazat
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="font-medium">Připravte se na losování cen!</div>
+                      <div className="text-sm text-muted-foreground">Cílová skupina: Stánkaři</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch defaultChecked={false} />
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-4 w-4 mr-1" />
+                        Upravit
+                      </Button>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Smazat
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {(!banner) && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Žádný banner není aktivní</p>
+                  </div>
                 )}
               </CardContent>
             </Card>

@@ -79,6 +79,7 @@ export interface Banner {
   id: number;
   text: string;
   isActive: boolean;
+  targetAudience: 'all' | 'participants' | 'booth_staff';
   createdAt: string;
   createdBy: string;
 }
@@ -111,7 +112,7 @@ interface DataContextType {
   registerParticipant: (userData: Omit<User, 'id' | 'progress' | 'visits' | 'visitedBooths' | 'password_hash'> & { password: string }) => Promise<boolean>;
   loginParticipant: (personalNumber: string, password: string) => Promise<User | null>;
   addUserByAdmin: (userData: { personalNumber: string; firstName: string; lastName: string; position: string; password?: string }) => Promise<boolean>;
-  updateBanner: (text: string, isActive: boolean) => Promise<void>;
+  updateBanner: (text: string, isActive: boolean, targetAudience?: 'all' | 'participants' | 'booth_staff') => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -444,6 +445,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         id: data.id,
         text: data.text,
         isActive: data.is_active,
+        targetAudience: data.target_audience,
         createdAt: data.created_at,
         createdBy: data.created_by
       });
@@ -764,8 +766,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }));
   }, [booths.length]);
 
-  const updateBanner = async (text: string, isActive: boolean) => {
-    console.log('📢 DataContext: Updating banner:', { text, isActive });
+  const updateBanner = async (text: string, isActive: boolean, targetAudience: 'all' | 'participants' | 'booth_staff' = 'all') => {
+    console.log('📢 DataContext: Updating banner:', { text, isActive, targetAudience });
     try {
       if (isActive && text.trim()) {
         // Create or update active banner
@@ -774,6 +776,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           .upsert([{
             text: text.trim(),
             is_active: true,
+            target_audience: targetAudience,
             created_by: 'admin',
             created_at: new Date().toISOString()
           }])
@@ -790,6 +793,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             id: data[0].id,
             text: data[0].text,
             isActive: data[0].is_active,
+            targetAudience: data[0].target_audience,
             createdAt: data[0].created_at,
             createdBy: data[0].created_by
           };

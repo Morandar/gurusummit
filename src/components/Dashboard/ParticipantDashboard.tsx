@@ -214,7 +214,9 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
         </header>
 
         {/* Scrolling Banner */}
-        <ScrollingBanner banner={banner} />
+        {banner && (banner.targetAudience === 'all' || banner.targetAudience === 'participants') && (
+          <ScrollingBanner banner={banner} />
+        )}
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
           <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-6 sm:mb-8">

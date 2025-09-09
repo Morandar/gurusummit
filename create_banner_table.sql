@@ -2,7 +2,8 @@
 CREATE TABLE IF NOT EXISTS public.banner (
     id SERIAL PRIMARY KEY,
     text TEXT NOT NULL,
-    is_active BOOLEAN DEFAULT true,
+    is_active BOOLEAN DEFAULT false,
+    target_audience TEXT DEFAULT 'all' CHECK (target_audience IN ('all', 'participants', 'booth_staff')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_by TEXT DEFAULT 'admin'
 );
@@ -22,6 +23,6 @@ CREATE POLICY "Allow authenticated users to manage banner" ON public.banner
 -- DROP TABLE IF EXISTS public.notifications CASCADE;
 
 -- Insert a default banner (optional)
-INSERT INTO public.banner (text, is_active, created_by)
-VALUES ('Vítejte na O2 Guru Summitu 2025!', true, 'admin')
+INSERT INTO public.banner (text, is_active, target_audience, created_by)
+VALUES ('Vítejte na O2 Guru Summitu 2025!', false, 'all', 'admin')
 ON CONFLICT DO NOTHING;

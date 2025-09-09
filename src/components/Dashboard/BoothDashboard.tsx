@@ -163,7 +163,9 @@ export const BoothDashboard = () => {
          </div>
 
        {/* Scrolling Banner */}
-       <ScrollingBanner banner={banner} />
+       {banner && (banner.targetAudience === 'all' || banner.targetAudience === 'booth_staff') && (
+         <ScrollingBanner banner={banner} />
+       )}
 
        <Tabs defaultValue="code" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">

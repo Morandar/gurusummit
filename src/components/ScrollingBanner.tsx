@@ -6,23 +6,24 @@ interface ScrollingBannerProps {
 }
 
 export const ScrollingBanner = ({ banner }: ScrollingBannerProps) => {
-  const [scrollPosition, setScrollPosition] = useState(0);
+  const [scrollPosition, setScrollPosition] = useState(100);
 
   useEffect(() => {
     if (!banner?.text) return;
 
-    const textWidth = banner.text.length * 10; // Approximate character width
-    const containerWidth = 400; // Approximate container width
-    const duration = (textWidth + containerWidth) / 50; // Speed adjustment
-
     const interval = setInterval(() => {
       setScrollPosition(prev => {
-        if (prev > textWidth + containerWidth) {
-          return -containerWidth; // Reset to start
+        // Move from right to left (negative values)
+        const newPosition = prev - 1;
+
+        // Reset when text has scrolled completely off screen
+        if (newPosition < -800) { // Adjust based on text length
+          return 100; // Reset to start from right
         }
-        return prev + 1;
+
+        return newPosition;
       });
-    }, 50); // Update every 50ms
+    }, 30); // Smoother animation with 30ms intervals
 
     return () => clearInterval(interval);
   }, [banner?.text]);
@@ -32,17 +33,17 @@ export const ScrollingBanner = ({ banner }: ScrollingBannerProps) => {
   }
 
   return (
-    <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 shadow-lg border-b">
+    <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 shadow-lg border-b relative overflow-hidden">
       <div className="max-w-7xl mx-auto">
-        <div className="overflow-hidden whitespace-nowrap">
+        <div className="relative">
           <div
-            className="inline-block text-sm font-medium"
+            className="inline-block text-sm font-medium whitespace-nowrap"
             style={{
               transform: `translateX(${scrollPosition}px)`,
               transition: 'none'
             }}
           >
-            📢 {banner.text} 📢 {banner.text} 📢 {banner.text}
+            📢 {banner.text} 📢 {banner.text} 📢 {banner.text} 📢 {banner.text} 📢 {banner.text}
           </div>
         </div>
       </div>
