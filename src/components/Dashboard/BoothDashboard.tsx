@@ -5,13 +5,16 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LogOut, Users, Trophy, Clock, BarChart3, KeyRound } from 'lucide-react';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { LogOut, Users, Trophy, Clock, BarChart3, KeyRound, Presentation, Coffee, Wrench, Users2, Award, Bell, User } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 
 export const BoothDashboard = () => {
   const { user, logout } = useAuth();
-  const { booths, program, users } = useData();
+  const { booths, program, users, notifications } = useData();
   const isLoading = false; // Temporary fix for TS cache issue
   // Pokud toast používáte, importujte useToast
   // import { useToast } from '@/hooks/use-toast';
@@ -94,6 +97,30 @@ export const BoothDashboard = () => {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
+  const getCategoryInfo = (category: string) => {
+    switch (category) {
+      case 'lecture':
+        return { icon: Presentation, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' };
+      case 'break':
+        return { icon: Coffee, color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' };
+      case 'workshop':
+        return { icon: Wrench, color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' };
+      case 'networking':
+        return { icon: Users2, color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' };
+      case 'ceremony':
+        return { icon: Award, color: 'text-yellow-600', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-200' };
+      default:
+        return { icon: Clock, color: 'text-gray-600', bgColor: 'bg-gray-50', borderColor: 'border-gray-200' };
+    }
+  };
+
+  // Filter notifications for booth staff (exclude participants only notifications)
+  const boothNotifications = notifications.filter(notification =>
+    notification.targetAudience === 'all' || notification.targetAudience === 'booth_staff'
+  );
+
+  const unreadNotificationsCount = boothNotifications.filter(n => n.isActive).length;
+
   useEffect(() => {
     const onFocus = () => {
       // TODO: Fetch last booth id from Supabase if needed
@@ -121,14 +148,73 @@ export const BoothDashboard = () => {
     <div className="min-h-screen bg-gradient-subtle">
       <div className="container mx-auto p-4 max-w-4xl">
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2"><BarChart3 className="h-5 w-5" /> {boothName}</h1>
-            <p className="text-muted-foreground">Přihlášený stánek</p>
-          </div>
-          <Button variant="outline" onClick={logout} className="gap-2">
-            <LogOut className="h-4 w-4" /> Odhlásit
-          </Button>
-        </div>
+           <div>
+             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2"><BarChart3 className="h-5 w-5" /> {boothName}</h1>
+             <p className="text-muted-foreground">Přihlášený stánek</p>
+           </div>
+           <div className="flex items-center gap-4">
+             <Popover>
+               <PopoverTrigger asChild>
+                 <div className="relative cursor-pointer">
+                   <Avatar className="h-8 w-8">
+                     <AvatarFallback className="text-xs">
+                       {user?.firstName && user?.lastName ?
+                         `${user.firstName[0]}${user.lastName[0]}` :
+                         <User className="h-4 w-4" />
+                       }
+                     </AvatarFallback>
+                   </Avatar>
+                   {unreadNotificationsCount > 0 && (
+                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                       {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                     </span>
+                   )}
+                 </div>
+               </PopoverTrigger>
+               <PopoverContent className="w-80 p-0" align="end">
+                 <div className="p-4 border-b">
+                   <h3 className="font-semibold">Upozornění</h3>
+                   <p className="text-sm text-muted-foreground">
+                     {unreadNotificationsCount > 0
+                       ? `${unreadNotificationsCount} nových upozornění`
+                       : 'Žádná nová upozornění'
+                     }
+                   </p>
+                 </div>
+                 <ScrollArea className="h-80">
+                   {boothNotifications.length === 0 ? (
+                     <div className="p-4 text-center text-muted-foreground">
+                       <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                       <p className="text-sm">Žádná upozornění</p>
+                     </div>
+                   ) : (
+                     <div className="divide-y">
+                       {boothNotifications.map((notification) => (
+                         <div key={notification.id} className="p-4 hover:bg-muted/50">
+                           <div className="flex items-start gap-3">
+                             <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                             <div className="flex-1 min-w-0">
+                               <h4 className="font-medium text-sm">{notification.title}</h4>
+                               <p className="text-sm text-muted-foreground mt-1">
+                                 {notification.message}
+                               </p>
+                               <p className="text-xs text-muted-foreground mt-2">
+                                 {new Date(notification.createdAt).toLocaleString('cs-CZ')}
+                               </p>
+                             </div>
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   )}
+                 </ScrollArea>
+               </PopoverContent>
+             </Popover>
+             <Button variant="outline" onClick={logout} className="gap-2">
+               <LogOut className="h-4 w-4" /> Odhlásit
+             </Button>
+           </div>
+         </div>
 
         <Tabs defaultValue="code" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
@@ -299,11 +385,18 @@ export const BoothDashboard = () => {
                       const itemEndTime = itemTime + Number(item.duration || 0);
                       const isActive = currentTime >= itemTime && currentTime < itemEndTime;
                       const isPast = currentTime >= itemEndTime;
+                      const categoryInfo = getCategoryInfo(item.category || 'lecture');
+                      const CategoryIcon = categoryInfo.icon;
+
                       return (
                         <div
                           key={item.id ?? index}
                           className={`flex items-center gap-4 p-3 rounded-lg transition-colors ${
-                            isActive ? 'bg-primary/10 border border-primary/20' : isPast ? 'bg-muted/30 text-muted-foreground' : 'bg-card'
+                            isActive
+                              ? 'bg-primary/10 border border-primary/20'
+                              : isPast
+                              ? 'bg-muted/30 text-muted-foreground'
+                              : `${categoryInfo.bgColor} ${categoryInfo.borderColor} border`
                           }`}
                         >
                           <div className="flex-shrink-0">
@@ -311,9 +404,18 @@ export const BoothDashboard = () => {
                               {item.time}
                             </Badge>
                           </div>
+                          <div className={`p-2 rounded-full ${categoryInfo.bgColor}`}>
+                            <CategoryIcon className={`h-4 w-4 ${categoryInfo.color}`} />
+                          </div>
                           <div className="flex-1">
                             <div className={`font-medium ${isPast ? 'line-through' : ''}`}>{item.event}</div>
-                            <div className="text-sm text-muted-foreground">{Number(item.duration || 0)} minut</div>
+                            <div className="text-sm text-muted-foreground">
+                              {Number(item.duration || 0)} minut • {item.category === 'lecture' ? 'Přednáška' :
+                                                                      item.category === 'break' ? 'Pauza' :
+                                                                      item.category === 'workshop' ? 'Workshop' :
+                                                                      item.category === 'networking' ? 'Networking' :
+                                                                      item.category === 'ceremony' ? 'Ceremoniál' : 'Událost'}
+                            </div>
                           </div>
                           {isActive && <Badge className="bg-secondary text-secondary-foreground">Probíhá</Badge>}
                         </div>
