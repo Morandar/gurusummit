@@ -75,15 +75,12 @@ interface DiscountedPhone {
   description?: string;
 }
 
-interface Notification {
+export interface Banner {
   id: number;
-  title: string;
-  message: string;
-  targetAudience: 'all' | 'participants' | 'booth_staff';
+  text: string;
+  isActive: boolean;
   createdAt: string;
   createdBy: string;
-  isActive: boolean;
-  isRead?: boolean;
 }
 
 interface DataContextType {
@@ -94,7 +91,7 @@ interface DataContextType {
   homePageTexts: HomePageTexts;
   winners: Winner[];
   discountedPhones: DiscountedPhone[];
-  notifications: Notification[];
+  banner: Banner | null;
   isLoading: boolean;
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   setBooths: React.Dispatch<React.SetStateAction<Booth[]>>;
@@ -103,7 +100,7 @@ interface DataContextType {
   setHomePageTexts: React.Dispatch<React.SetStateAction<HomePageTexts>>;
   setWinners: React.Dispatch<React.SetStateAction<Winner[]>>;
   setDiscountedPhones: React.Dispatch<React.SetStateAction<DiscountedPhone[]>>;
-  setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
+  setBanner: React.Dispatch<React.SetStateAction<Banner | null>>;
   visitBooth: (userId: number, boothId: number) => Promise<void>;
   getUserProgress: (userId: number) => number;
   resetAllProgress: () => void;
@@ -114,8 +111,7 @@ interface DataContextType {
   registerParticipant: (userData: Omit<User, 'id' | 'progress' | 'visits' | 'visitedBooths' | 'password_hash'> & { password: string }) => Promise<boolean>;
   loginParticipant: (personalNumber: string, password: string) => Promise<User | null>;
   addUserByAdmin: (userData: { personalNumber: string; firstName: string; lastName: string; position: string; password?: string }) => Promise<boolean>;
-  createNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => Promise<void>;
-  markNotificationAsRead: (notificationId: number, userId: number) => Promise<void>;
+  updateBanner: (text: string, isActive: boolean) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -218,7 +214,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [homePageTexts, setHomePageTextsState] = useState<HomePageTexts>(initialHomePageTexts);
   const [winners, setWinnersState] = useState<Winner[]>([]);
   const [discountedPhones, setDiscountedPhones] = useState<DiscountedPhone[]>(initialDiscountedPhones);
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
+  const [banner, setBanner] = useState<Banner | null>(null);
 
   // Registrace účastníka: hashování hesla a uložení do DB
   const registerParticipant = async (userData: Omit<User, 'id' | 'progress' | 'visits' | 'visitedBooths' | 'password_hash'> & { password: string }) => {
@@ -439,58 +435,24 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const fetchNotifications = async () => {
-    console.log('🔄 DataContext: Fetching notifications from Supabase...');
-    const { data, error } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+  const fetchBanner = async () => {
+    console.log('🔄 DataContext: Fetching banner from Supabase...');
+    const { data, error } = await supabase.from('banner').select('*').eq('is_active', true).single();
     if (!error && data) {
-      console.log('✅ DataContext: Fetched notifications:', data.length, 'notifications');
-      const mappedNotifications = data.map((notification: any) => {
-        // Get current user ID - try multiple sources
-        let userId = 'anonymous';
-        let userSource = 'none';
-
-        try {
-          // First try to get from context if available
-          const authUser = (window as any).__authUser;
-          if (authUser?.id) {
-            userId = authUser.id;
-            userSource = 'window';
-          } else {
-            // Fallback to localStorage
-            const storedUser = localStorage.getItem('authUser');
-            if (storedUser) {
-              const parsedUser = JSON.parse(storedUser);
-              if (parsedUser?.id) {
-                userId = parsedUser.id;
-                userSource = 'localStorage';
-                // Store in window for future use
-                (window as any).__authUser = parsedUser;
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('Could not get user ID for read status:', e);
-        }
-
-        const readKey = `notification_read_${userId}_${notification.id}`;
-        const isRead = localStorage.getItem(readKey) === 'true';
-
-        console.log(`📧 Notification ${notification.id} read status for user ${userId} (from ${userSource}):`, isRead, 'key:', readKey);
-
-        return {
-          id: notification.id,
-          title: notification.title,
-          message: notification.message,
-          targetAudience: notification.target_audience,
-          createdAt: notification.created_at,
-          createdBy: notification.created_by,
-          isActive: notification.is_active,
-          isRead: isRead
-        };
+      console.log('✅ DataContext: Fetched active banner:', data.text);
+      setBanner({
+        id: data.id,
+        text: data.text,
+        isActive: data.is_active,
+        createdAt: data.created_at,
+        createdBy: data.created_by
       });
-      setNotifications(mappedNotifications);
+    } else if (error?.code === 'PGRST116') {
+      // No active banner found
+      console.log('ℹ️ DataContext: No active banner found');
+      setBanner(null);
     } else if (error) {
-      console.error('❌ DataContext: Error fetching notifications:', error);
+      console.error('❌ DataContext: Error fetching banner:', error);
     }
   };
 
@@ -538,7 +500,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         await fetchBooths(); // Fetch booths first
         await fetchUsers(totalBooths); // Pass booth count to users
         await fetchProgram();
-        await fetchNotifications(); // Fetch notifications from database
+        await fetchBanner(); // Fetch banner from database
         await fetchWinners(); // Fetch winners from database
         await fetchDiscountedPhones(); // Fetch discounted phones from database
         await fetchSettings(); // Fetch settings from database
@@ -552,43 +514,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     };
     fetchData();
 
-    // Set up real-time subscription for notifications
-    console.log('📡 DataContext: Setting up real-time notifications subscription');
-    const notificationsSubscription = supabase
-      .channel('notifications_changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'notifications'
-      }, (payload) => {
-        console.log('📡 DataContext: Notifications table changed:', payload);
-        console.log('📡 DataContext: Event type:', payload.eventType);
-        console.log('📡 DataContext: New record:', payload.new);
-        // Refetch notifications when any change occurs
-        fetchNotifications();
-      })
-      .subscribe((status) => {
-        console.log('📡 DataContext: Subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('📡 DataContext: Successfully subscribed to notifications');
-        } else if (status === 'CLOSED') {
-          console.log('📡 DataContext: Subscription closed');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('📡 DataContext: Subscription channel error');
-        }
-      });
-
-    // Fallback: Periodic check for new notifications every 30 seconds
-    const fallbackInterval = setInterval(() => {
-      console.log('🔄 DataContext: Fallback check for new notifications');
-      fetchNotifications();
+    // Set up periodic banner check every 30 seconds
+    console.log('📢 DataContext: Setting up banner polling every 30 seconds');
+    const bannerInterval = setInterval(() => {
+      console.log('🔄 DataContext: Polling for banner updates');
+      fetchBanner();
     }, 30000); // Check every 30 seconds
 
-    // Cleanup subscription and interval on unmount
+    // Cleanup interval on unmount
     return () => {
-      console.log('📡 DataContext: Cleaning up notifications subscription and fallback');
-      notificationsSubscription.unsubscribe();
-      clearInterval(fallbackInterval);
+      console.log('🧹 DataContext: Cleaning up banner polling');
+      clearInterval(bannerInterval);
     };
   }, []);
 
@@ -828,100 +764,63 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }));
   }, [booths.length]);
 
-  const createNotification = async (notification: Omit<Notification, 'id' | 'createdAt'>) => {
-    console.log('🔔 DataContext: Creating notification:', notification);
+  const updateBanner = async (text: string, isActive: boolean) => {
+    console.log('📢 DataContext: Updating banner:', { text, isActive });
     try {
-      const newNotification = {
-        ...notification,
-        createdAt: new Date().toISOString()
-      };
+      if (isActive && text.trim()) {
+        // Create or update active banner
+        const { data, error } = await supabase
+          .from('banner')
+          .upsert([{
+            text: text.trim(),
+            is_active: true,
+            created_by: 'admin',
+            created_at: new Date().toISOString()
+          }])
+          .select();
 
-      console.log('📤 DataContext: Inserting notification to database:', {
-        title: newNotification.title,
-        message: newNotification.message,
-        target_audience: newNotification.targetAudience,
-        created_by: newNotification.createdBy,
-        is_active: newNotification.isActive
-      });
+        if (error) {
+          console.error('❌ DataContext: Error updating banner:', error);
+          toast({ title: 'Chyba při aktualizaci banneru', description: error.message });
+          return;
+        }
 
-      const { data, error } = await supabase
-        .from('notifications')
-        .insert([{
-          title: newNotification.title,
-          message: newNotification.message,
-          target_audience: newNotification.targetAudience,
-          created_by: newNotification.createdBy,
-          is_active: newNotification.isActive
-        }])
-        .select();
+        if (data && data[0]) {
+          const updatedBanner: Banner = {
+            id: data[0].id,
+            text: data[0].text,
+            isActive: data[0].is_active,
+            createdAt: data[0].created_at,
+            createdBy: data[0].created_by
+          };
 
-      if (error) {
-        console.error('❌ DataContext: Error creating notification:', error);
-        return;
-      }
-
-      if (data && data[0]) {
-        const createdNotification: Notification = {
-          id: data[0].id,
-          title: data[0].title,
-          message: data[0].message,
-          targetAudience: data[0].target_audience,
-          createdAt: data[0].created_at,
-          createdBy: data[0].created_by,
-          isActive: data[0].is_active
-        };
-
-        console.log('✅ DataContext: Notification created successfully:', createdNotification);
-        setNotifications(prev => [createdNotification, ...prev]);
-        console.log('🔄 DataContext: Local notifications state updated');
-
-        // Refetch notifications immediately to ensure all clients get the update
-        console.log('🚀 DataContext: Triggering immediate refetch for real-time update');
-        fetchNotifications();
-
-        // Also trigger after a short delay as backup
-        setTimeout(() => {
-          console.log('🔄 DataContext: Backup refetch for real-time update');
-          fetchNotifications();
-        }, 2000);
+          console.log('✅ DataContext: Banner updated successfully:', updatedBanner);
+          setBanner(updatedBanner);
+          toast({ title: 'Banner aktualizován', description: 'Banner byl úspěšně aktualizován' });
+        }
       } else {
-        console.warn('⚠️ DataContext: No data returned from notification creation');
+        // Deactivate banner
+        const { error } = await supabase
+          .from('banner')
+          .update({ is_active: false })
+          .eq('is_active', true);
+
+        if (error) {
+          console.error('❌ DataContext: Error deactivating banner:', error);
+          toast({ title: 'Chyba při deaktivaci banneru', description: error.message });
+          return;
+        }
+
+        console.log('✅ DataContext: Banner deactivated');
+        setBanner(null);
+        toast({ title: 'Banner deaktivován', description: 'Banner byl úspěšně deaktivován' });
       }
     } catch (error) {
-      console.error('❌ DataContext: Create notification error:', error);
+      console.error('❌ DataContext: Update banner error:', error);
+      toast({ title: 'Chyba při aktualizaci banneru', description: 'Nastala neočekávaná chyba' });
     }
   };
 
-  const markNotificationAsRead = async (notificationId: number, userId: number | string) => {
-    try {
-      console.log(`🔔 DataContext: Marking notification ${notificationId} as read for user ${userId}`);
-
-      // Ensure userId is a string for localStorage key
-      const userIdStr = String(userId);
-
-      // Store read status in localStorage (keyed by userId and notificationId)
-      const readKey = `notification_read_${userIdStr}_${notificationId}`;
-      localStorage.setItem(readKey, 'true');
-      console.log(`💾 DataContext: Stored read status in localStorage:`, readKey, '=', localStorage.getItem(readKey));
-
-      // Update window object for consistency
-      if (!(window as any).__authUser) {
-        (window as any).__authUser = { id: userIdStr };
-      }
-
-      // Update local state to reflect the read status
-      setNotifications(prev => prev.map(notification =>
-        notification.id === notificationId
-          ? { ...notification, isRead: true }
-          : notification
-      ));
-
-      console.log(`✅ DataContext: Notification ${notificationId} marked as read for user ${userIdStr}`);
-      console.log(`🔍 DataContext: Current localStorage keys:`, Object.keys(localStorage).filter(key => key.startsWith('notification_read_')));
-    } catch (error) {
-      console.error('❌ DataContext: Mark notification as read error:', error);
-    }
-  };
 
 
 
@@ -937,7 +836,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       homePageTexts,
       winners,
       discountedPhones,
-      notifications,
+      banner,
       isLoading,
       setUsers,
       setBooths,
@@ -946,7 +845,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       setHomePageTexts,
       setWinners,
       setDiscountedPhones,
-      setNotifications,
+      setBanner,
       visitBooth,
       getUserProgress,
       resetAllProgress,
@@ -957,8 +856,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       registerParticipant,
       loginParticipant,
       addUserByAdmin,
-      createNotification,
-      markNotificationAsRead,
+      updateBanner,
     }}>
       {children}
     </DataContext.Provider>

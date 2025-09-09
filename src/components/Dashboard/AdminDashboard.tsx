@@ -24,9 +24,9 @@ import { Textarea } from '@/components/ui/textarea';
 export const AdminDashboard = () => {
   const { logout } = useAuth();
   const {
-    users, booths, program, codeTimeSettings, homePageTexts, winners, discountedPhones, notifications,
-    setUsers, setBooths, setProgram, setCodeTimeSettings, setHomePageTexts, setDiscountedPhones, setNotifications,
-    resetAllProgress, removeUserProfileImage, addUserByAdmin, createNotification
+    users, booths, program, codeTimeSettings, homePageTexts, winners, discountedPhones, banner,
+    setUsers, setBooths, setProgram, setCodeTimeSettings, setHomePageTexts, setDiscountedPhones, setBanner,
+    resetAllProgress, removeUserProfileImage, addUserByAdmin, updateBanner
   } = useData();
   const isLoading = false; // Temporary fix for TS cache issue
   const { toast } = useToast();
@@ -59,11 +59,6 @@ export const AdminDashboard = () => {
     description: ''
   });
 
-  const [notificationForm, setNotificationForm] = useState({
-    title: '',
-    message: '',
-    targetAudience: 'all' as 'all' | 'participants' | 'booth_staff'
-  });
   
   // Local draft state for homepage texts
   const [homePageTextsDraft, setHomePageTextsDraft] = useState(homePageTexts);
@@ -732,7 +727,7 @@ export const AdminDashboard = () => {
              <TabsTrigger value="booths">Stánky</TabsTrigger>
              <TabsTrigger value="program">Program</TabsTrigger>
              <TabsTrigger value="phones">Zlevněné telefony</TabsTrigger>
-             <TabsTrigger value="notifications">Upozornění</TabsTrigger>
+             <TabsTrigger value="banner">Banner</TabsTrigger>
              <TabsTrigger value="settings">Nastavení</TabsTrigger>
              <TabsTrigger value="actions">Akce</TabsTrigger>
            </TabsList>
@@ -1186,122 +1181,97 @@ export const AdminDashboard = () => {
             )}
           </TabsContent>
 
-          {/* Notifications Tab */}
-          <TabsContent value="notifications" className="space-y-4">
+          {/* Banner Tab */}
+          <TabsContent value="banner" className="space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Správa upozornění</h3>
-              <Button onClick={() => setNotificationForm({ title: '', message: '', targetAudience: 'all' })}>
-                <Plus className="h-4 w-4 mr-2" />
-                Vytvořit upozornění
-              </Button>
+              <h3 className="text-lg font-semibold">Správa banneru</h3>
             </div>
 
             <Card>
               <CardHeader>
-                <CardTitle>Vytvořit nové upozornění</CardTitle>
+                <CardTitle>Správa posuvného banneru</CardTitle>
                 <CardDescription>
-                  Odešlete upozornění všem uživatelům, jen účastníkům nebo jen stánkařům
+                  Vytvořte nebo upravte banner, který se zobrazuje všem uživatelům
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="notification-title">Nadpis</Label>
-                  <Input
-                    id="notification-title"
-                    value={notificationForm.title}
-                    onChange={(e) => setNotificationForm(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="Zadejte nadpis upozornění"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="notification-message">Zpráva</Label>
+                  <Label htmlFor="banner-text">Text banneru</Label>
                   <Textarea
-                    id="notification-message"
-                    value={notificationForm.message}
-                    onChange={(e) => setNotificationForm(prev => ({ ...prev, message: e.target.value }))}
-                    placeholder="Zadejte text upozornění"
+                    id="banner-text"
+                    value={banner?.text || ''}
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      if (banner) {
+                        updateBanner(text, banner.isActive);
+                      } else if (text.trim()) {
+                        updateBanner(text, true);
+                      }
+                    }}
+                    placeholder="Zadejte text banneru"
                     rows={3}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="notification-audience">Cílová skupina</Label>
-                  <Select
-                    value={notificationForm.targetAudience}
-                    onValueChange={(value: 'all' | 'participants' | 'booth_staff') =>
-                      setNotificationForm(prev => ({ ...prev, targetAudience: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Vyberte cílovou skupinu" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Všichni uživatelé</SelectItem>
-                      <SelectItem value="participants">Jen účastníci</SelectItem>
-                      <SelectItem value="booth_staff">Jen stánkaři</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={banner?.isActive || false}
+                    onCheckedChange={(checked) => {
+                      const text = banner?.text || '';
+                      if (checked && !text.trim()) {
+                        toast({ title: 'Chyba', description: 'Nejdříve zadejte text banneru' });
+                        return;
+                      }
+                      updateBanner(text, checked);
+                    }}
+                  />
+                  <Label>Aktivovat banner</Label>
                 </div>
-                <Button
-                  onClick={async () => {
-                    if (notificationForm.title && notificationForm.message) {
-                      console.log('📤 AdminDashboard: Sending notification:', {
-                        title: notificationForm.title,
-                        message: notificationForm.message,
-                        targetAudience: notificationForm.targetAudience
-                      });
-                      await createNotification({
-                        title: notificationForm.title,
-                        message: notificationForm.message,
-                        targetAudience: notificationForm.targetAudience,
-                        createdBy: 'admin',
-                        isActive: true
-                      });
-                      console.log('✅ AdminDashboard: createNotification called');
-                      setNotificationForm({ title: '', message: '', targetAudience: 'all' });
-                      toast({ title: 'Upozornění odesláno', description: 'Upozornění bylo úspěšně odesláno' });
-                    }
-                  }}
-                  disabled={!notificationForm.title || !notificationForm.message}
-                >
-                  Odeslat upozornění
-                </Button>
+                {banner && (
+                  <div className="mt-4 p-4 bg-muted rounded-lg">
+                    <h4 className="font-medium mb-2">Náhled banneru:</h4>
+                    <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded shadow-lg">
+                      <div className="max-w-7xl mx-auto">
+                        <div className="overflow-hidden whitespace-nowrap">
+                          <div className="inline-block text-sm font-medium">
+                            📢 {banner.text} 📢 {banner.text} 📢 {banner.text}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Odeslaná upozornění</CardTitle>
+                <CardTitle>Informace o banneru</CardTitle>
                 <CardDescription>
-                  Historie odeslaných upozornění
+                  Aktuální stav banneru
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {(() => {
-                  console.log('📋 AdminDashboard: Current notifications in state:', notifications.length, notifications);
-                  return null;
-                })()}
-                {notifications.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-4">
-                    Žádná upozornění nebyla dosud odeslána
-                  </p>
-                ) : (
+                {banner ? (
                   <div className="space-y-3">
-                    {notifications.map((notification) => (
-                      <div key={notification.id} className="border rounded-lg p-3">
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-medium">{notification.title}</h4>
-                          <Badge variant="outline">
-                            {notification.targetAudience === 'all' ? 'Všichni' :
-                             notification.targetAudience === 'participants' ? 'Účastníci' : 'Stánkaři'}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-2">{notification.message}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(notification.createdAt).toLocaleString('cs-CZ')}
-                        </p>
-                      </div>
-                    ))}
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Status:</span>
+                      <Badge variant={banner.isActive ? 'default' : 'secondary'}>
+                        {banner.isActive ? 'Aktivní' : 'Neaktivní'}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Vytvořeno:</span>
+                      <span className="text-sm">{new Date(banner.createdAt).toLocaleString('cs-CZ')}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Vytvořil:</span>
+                      <span className="text-sm">{banner.createdBy}</span>
+                    </div>
                   </div>
+                ) : (
+                  <p className="text-muted-foreground text-center py-4">
+                    Žádný banner nebyl dosud vytvořen
+                  </p>
                 )}
               </CardContent>
             </Card>

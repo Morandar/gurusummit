@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { BoothCodeModal } from '@/components/Modals/BoothCodeModal';
 import { ProfileEditModal } from '@/components/Profile/ProfileEditModal';
+import { ScrollingBanner } from '@/components/ScrollingBanner';
 import { Clock, MapPin, Trophy, Calendar, Smartphone, Lock, User, DollarSign, Star, Award, Bell, Presentation, Coffee, Wrench, Users2 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 
@@ -19,11 +20,10 @@ interface ParticipantDashboardProps {
 }
 
 export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: ParticipantDashboardProps) => {
-  const { booths, program, users, visitBooth, isLoading, discountedPhones, notifications, markNotificationAsRead } = useData();
+  const { booths, program, users, visitBooth, isLoading, discountedPhones, banner } = useData();
   const [timeToNext, setTimeToNext] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [selectedBooth, setSelectedBooth] = useState<{ id: number; name: string } | null>(null);
-  const [showNotifications, setShowNotifications] = useState(false);
   
   // Get current user data from global state
   const currentUser = users.find(u => u.personalNumber === user.personalNumber);
@@ -138,17 +138,6 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
     }
   };
 
-  // Filter notifications for participants (exclude booth_staff only notifications)
-  const userNotifications = notifications.filter(notification =>
-    notification.targetAudience === 'all' || notification.targetAudience === 'participants'
-  );
-
-  const unreadNotificationsCount = userNotifications.filter(n => n.isActive && !n.isRead).length;
-
-  // Debug logs for notifications
-  console.log('🔔 ParticipantDashboard: Total notifications:', notifications.length);
-  console.log('👤 ParticipantDashboard: Filtered user notifications:', userNotifications.length);
-  console.log('📬 ParticipantDashboard: Unread notifications count:', unreadNotificationsCount);
 
   const handleBoothVisit = (boothId: number, boothName: string) => {
     if (!visitedBooths.includes(boothId)) {
@@ -201,73 +190,15 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                 <h1 className="text-lg sm:text-xl font-bold text-primary">O2 Guru Summit 2025</h1>
               </div>
               <div className="flex items-center space-x-2 sm:space-x-4">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <div className="relative cursor-pointer">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={currentUser?.profileImage} />
-                        <AvatarFallback className="text-xs">
-                          {user.firstName && user.lastName ?
-                            `${user.firstName[0]}${user.lastName[0]}` :
-                            <User className="h-4 w-4" />
-                          }
-                        </AvatarFallback>
-                      </Avatar>
-                      {unreadNotificationsCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                          {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
-                        </span>
-                      )}
-                    </div>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80 p-0" align="end">
-                    <div className="p-4 border-b">
-                      <h3 className="font-semibold">Upozornění</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {unreadNotificationsCount > 0
-                          ? `${unreadNotificationsCount} nových upozornění`
-                          : 'Žádná nová upozornění'
-                        }
-                      </p>
-                    </div>
-                    <ScrollArea className="h-80">
-                      {userNotifications.length === 0 ? (
-                        <div className="p-4 text-center text-muted-foreground">
-                          <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">Žádná upozornění</p>
-                        </div>
-                      ) : (
-                        <div className="divide-y">
-                          {userNotifications.map((notification) => (
-                            <div
-                              key={notification.id}
-                              className={`p-4 hover:bg-muted/50 cursor-pointer ${notification.isRead ? 'opacity-75' : ''}`}
-                              onClick={() => {
-                                if (!notification.isRead && currentUser) {
-                                  markNotificationAsRead(notification.id, currentUser.id);
-                                }
-                              }}
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${notification.isRead ? 'bg-gray-400' : 'bg-blue-500'}`}></div>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-medium text-sm">{notification.title}</h4>
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                    {notification.message}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-2">
-                                    {new Date(notification.createdAt).toLocaleString('cs-CZ')}
-                                    {notification.isRead && <span className="ml-2 text-xs">(přečteno)</span>}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </ScrollArea>
-                  </PopoverContent>
-                </Popover>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={currentUser?.profileImage} />
+                  <AvatarFallback className="text-xs">
+                    {user.firstName && user.lastName ?
+                      `${user.firstName[0]}${user.lastName[0]}` :
+                      <User className="h-4 w-4" />
+                    }
+                  </AvatarFallback>
+                </Avatar>
                 <span className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
                   {user.firstName} {user.lastName}
                 </span>
@@ -281,6 +212,9 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
             </div>
           </div>
         </header>
+
+        {/* Scrolling Banner */}
+        <ScrollingBanner banner={banner} />
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
           <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-6 sm:mb-8">

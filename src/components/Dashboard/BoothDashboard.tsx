@@ -11,10 +11,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { LogOut, Users, Trophy, Clock, BarChart3, KeyRound, Presentation, Coffee, Wrench, Users2, Award, Bell, User } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
+import { ScrollingBanner } from '@/components/ScrollingBanner';
 
 export const BoothDashboard = () => {
   const { user, logout } = useAuth();
-  const { booths, program, users, notifications, markNotificationAsRead } = useData();
+  const { booths, program, users, banner } = useData();
   const isLoading = false; // Temporary fix for TS cache issue
   // Pokud toast používáte, importujte useToast
   // import { useToast } from '@/hooks/use-toast';
@@ -114,12 +115,6 @@ export const BoothDashboard = () => {
     }
   };
 
-  // Filter notifications for booth staff (exclude participants only notifications)
-  const boothNotifications = notifications.filter(notification =>
-    notification.targetAudience === 'all' || notification.targetAudience === 'booth_staff'
-  );
-
-  const unreadNotificationsCount = boothNotifications.filter(n => n.isActive && !n.isRead).length;
 
   useEffect(() => {
     const onFocus = () => {
@@ -153,79 +148,24 @@ export const BoothDashboard = () => {
              <p className="text-muted-foreground">Přihlášený stánek</p>
            </div>
            <div className="flex items-center gap-4">
-             <Popover>
-               <PopoverTrigger asChild>
-                 <div className="relative cursor-pointer">
-                   <Avatar className="h-8 w-8">
-                     <AvatarFallback className="text-xs">
-                       {user?.firstName && user?.lastName ?
-                         `${user.firstName[0]}${user.lastName[0]}` :
-                         <User className="h-4 w-4" />
-                       }
-                     </AvatarFallback>
-                   </Avatar>
-                   {unreadNotificationsCount > 0 && (
-                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                       {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
-                     </span>
-                   )}
-                 </div>
-               </PopoverTrigger>
-               <PopoverContent className="w-80 p-0" align="end">
-                 <div className="p-4 border-b">
-                   <h3 className="font-semibold">Upozornění</h3>
-                   <p className="text-sm text-muted-foreground">
-                     {unreadNotificationsCount > 0
-                       ? `${unreadNotificationsCount} nových upozornění`
-                       : 'Žádná nová upozornění'
-                     }
-                   </p>
-                 </div>
-                 <ScrollArea className="h-80">
-                   {boothNotifications.length === 0 ? (
-                     <div className="p-4 text-center text-muted-foreground">
-                       <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                       <p className="text-sm">Žádná upozornění</p>
-                     </div>
-                   ) : (
-                     <div className="divide-y">
-                       {boothNotifications.map((notification) => (
-                         <div
-                           key={notification.id}
-                           className={`p-4 hover:bg-muted/50 cursor-pointer ${notification.isRead ? 'opacity-75' : ''}`}
-                           onClick={() => {
-                             if (!notification.isRead && user) {
-                               markNotificationAsRead(notification.id, parseInt(user.id));
-                             }
-                           }}
-                         >
-                           <div className="flex items-start gap-3">
-                             <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${notification.isRead ? 'bg-gray-400' : 'bg-blue-500'}`}></div>
-                             <div className="flex-1 min-w-0">
-                               <h4 className="font-medium text-sm">{notification.title}</h4>
-                               <p className="text-sm text-muted-foreground mt-1">
-                                 {notification.message}
-                               </p>
-                               <p className="text-xs text-muted-foreground mt-2">
-                                 {new Date(notification.createdAt).toLocaleString('cs-CZ')}
-                                 {notification.isRead && <span className="ml-2 text-xs">(přečteno)</span>}
-                               </p>
-                             </div>
-                           </div>
-                         </div>
-                       ))}
-                     </div>
-                   )}
-                 </ScrollArea>
-               </PopoverContent>
-             </Popover>
+             <Avatar className="h-8 w-8">
+               <AvatarFallback className="text-xs">
+                 {user?.firstName && user?.lastName ?
+                   `${user.firstName[0]}${user.lastName[0]}` :
+                   <User className="h-4 w-4" />
+                 }
+               </AvatarFallback>
+             </Avatar>
              <Button variant="outline" onClick={logout} className="gap-2">
                <LogOut className="h-4 w-4" /> Odhlásit
              </Button>
            </div>
          </div>
 
-        <Tabs defaultValue="code" className="space-y-6">
+       {/* Scrolling Banner */}
+       <ScrollingBanner banner={banner} />
+
+       <Tabs defaultValue="code" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="code" className="flex items-center gap-2"><KeyRound className="h-4 w-4" /> Kód stánku</TabsTrigger>
             <TabsTrigger value="stats" className="flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Statistiky</TabsTrigger>
