@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -7,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { BoothCodeModal } from '@/components/Modals/BoothCodeModal';
 import { ProfileEditModal } from '@/components/Profile/ProfileEditModal';
-import { Clock, MapPin, Trophy, Calendar, Smartphone, Lock, User, DollarSign, Star, Award, Bell } from 'lucide-react';
+import { Clock, MapPin, Trophy, Calendar, Smartphone, Lock, User, DollarSign, Star, Award, Bell, Presentation, Coffee, Wrench, Users2 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 
 interface ParticipantDashboardProps {
@@ -21,6 +23,7 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
   const [timeToNext, setTimeToNext] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [selectedBooth, setSelectedBooth] = useState<{ id: number; name: string } | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
   
   // Get current user data from global state
   const currentUser = users.find(u => u.personalNumber === user.personalNumber);
@@ -118,6 +121,30 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
     return `${endHour.toString().padStart(2, '0')}:${finalMinute.toString().padStart(2, '0')}`;
   };
 
+  const getCategoryInfo = (category: string) => {
+    switch (category) {
+      case 'lecture':
+        return { icon: Presentation, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' };
+      case 'break':
+        return { icon: Coffee, color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' };
+      case 'workshop':
+        return { icon: Wrench, color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' };
+      case 'networking':
+        return { icon: Users2, color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' };
+      case 'ceremony':
+        return { icon: Award, color: 'text-yellow-600', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-200' };
+      default:
+        return { icon: Calendar, color: 'text-gray-600', bgColor: 'bg-gray-50', borderColor: 'border-gray-200' };
+    }
+  };
+
+  // Filter notifications for participants (exclude booth_staff only notifications)
+  const userNotifications = notifications.filter(notification =>
+    notification.targetAudience === 'all' || notification.targetAudience === 'participants'
+  );
+
+  const unreadNotificationsCount = userNotifications.filter(n => n.isActive).length;
+
   const handleBoothVisit = (boothId: number, boothName: string) => {
     if (!visitedBooths.includes(boothId)) {
       setSelectedBooth({ id: boothId, name: boothName });
@@ -169,30 +196,67 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                 <h1 className="text-lg sm:text-xl font-bold text-primary">O2 Guru Summit 2025</h1>
               </div>
               <div className="flex items-center space-x-2 sm:space-x-4">
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={currentUser?.profileImage} />
-                    <AvatarFallback className="text-xs">
-                      {user.firstName && user.lastName ?
-                        `${user.firstName[0]}${user.lastName[0]}` :
-                        <User className="h-4 w-4" />
-                      }
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
-                    {user.firstName} {user.lastName}
-                  </span>
-                </div>
-                {notifications.length > 0 && (
-                  <div className="relative">
-                    <Bell className="h-5 w-5 text-muted-foreground cursor-pointer hover:text-primary" />
-                    {notifications.filter(n => n.isActive).length > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                        {notifications.filter(n => n.isActive).length}
-                      </span>
-                    )}
-                  </div>
-                )}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <div className="relative cursor-pointer">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={currentUser?.profileImage} />
+                        <AvatarFallback className="text-xs">
+                          {user.firstName && user.lastName ?
+                            `${user.firstName[0]}${user.lastName[0]}` :
+                            <User className="h-4 w-4" />
+                          }
+                        </AvatarFallback>
+                      </Avatar>
+                      {unreadNotificationsCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                          {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                        </span>
+                      )}
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-0" align="end">
+                    <div className="p-4 border-b">
+                      <h3 className="font-semibold">Upozornění</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {unreadNotificationsCount > 0
+                          ? `${unreadNotificationsCount} nových upozornění`
+                          : 'Žádná nová upozornění'
+                        }
+                      </p>
+                    </div>
+                    <ScrollArea className="h-80">
+                      {userNotifications.length === 0 ? (
+                        <div className="p-4 text-center text-muted-foreground">
+                          <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">Žádná upozornění</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y">
+                          {userNotifications.map((notification) => (
+                            <div key={notification.id} className="p-4 hover:bg-muted/50">
+                              <div className="flex items-start gap-3">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium text-sm">{notification.title}</h4>
+                                  <p className="text-sm text-muted-foreground mt-1">
+                                    {notification.message}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    {new Date(notification.createdAt).toLocaleString('cs-CZ')}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
+                <span className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
+                  {user.firstName} {user.lastName}
+                </span>
                 {onUserUpdate && (
                   <ProfileEditModal user={user} onUserUpdate={onUserUpdate} />
                 )}
@@ -382,27 +446,37 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                     const isActive = currentTime >= itemTime && currentTime < itemEndTime;
                     const isPast = currentTime >= itemEndTime;
 
+                    const categoryInfo = getCategoryInfo(item.category || 'lecture');
+                    const CategoryIcon = categoryInfo.icon;
+
                     return (
                       <div
                         key={item.id}
                         className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
-                          isActive 
-                            ? 'bg-primary/10 border border-primary/20' 
-                            : isPast 
-                            ? 'bg-muted/30' 
-                            : 'bg-card border'
+                          isActive
+                            ? 'bg-primary/10 border border-primary/20'
+                            : isPast
+                            ? 'bg-muted/30'
+                            : `${categoryInfo.bgColor} ${categoryInfo.borderColor} border`
                         }`}
                       >
                         <div className="flex items-center gap-4">
                           <Badge variant={isActive ? 'default' : isPast ? 'secondary' : 'outline'}>
                             {item.time}
                           </Badge>
+                          <div className={`p-2 rounded-full ${categoryInfo.bgColor}`}>
+                            <CategoryIcon className={`h-4 w-4 ${categoryInfo.color}`} />
+                          </div>
                           <div>
                             <div className={`font-medium ${isPast ? 'line-through text-muted-foreground' : ''}`}>
                               {item.event}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {item.duration} minut
+                              {item.duration} minut • {item.category === 'lecture' ? 'Přednáška' :
+                                                    item.category === 'break' ? 'Pauza' :
+                                                    item.category === 'workshop' ? 'Workshop' :
+                                                    item.category === 'networking' ? 'Networking' :
+                                                    item.category === 'ceremony' ? 'Ceremoniál' : 'Událost'}
                             </div>
                           </div>
                         </div>
