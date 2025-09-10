@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS public.banner (
     text TEXT NOT NULL,
     is_active BOOLEAN DEFAULT false,
     target_audience TEXT DEFAULT 'all' CHECK (target_audience IN ('all', 'participants', 'booth_staff')),
+    color TEXT DEFAULT 'blue-purple' CHECK (color IN ('blue-purple', 'green-teal', 'red-pink', 'yellow-orange', 'indigo-cyan')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_by TEXT DEFAULT 'admin'
 );

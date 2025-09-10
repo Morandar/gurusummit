@@ -90,6 +90,7 @@ export interface Banner {
   text: string;
   isActive: boolean;
   targetAudience: 'all' | 'participants' | 'booth_staff';
+  color: 'blue-purple' | 'green-teal' | 'red-pink' | 'yellow-orange' | 'indigo-cyan';
   createdAt: string;
   createdBy: string;
 }
@@ -513,6 +514,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           text: banner.text,
           isActive: banner.is_active,
           targetAudience: banner.target_audience || 'all',
+          color: banner.color || 'blue-purple',
           createdAt: banner.created_at,
           createdBy: banner.created_by
         }));
@@ -569,6 +571,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           text: banner.text,
           isActive: banner.is_active,
           targetAudience: banner.target_audience || 'all',
+          color: banner.color || 'blue-purple',
           createdAt: banner.created_at,
           createdBy: banner.created_by
         }));
@@ -994,6 +997,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
               text: data.text,
               isActive: data.is_active,
               targetAudience: data.target_audience,
+              color: data.color || 'blue-purple',
               createdAt: data.created_at,
               createdBy: data.created_by
             };
@@ -1071,6 +1075,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             text: result.text,
             isActive: result.is_active,
             targetAudience: result.target_audience,
+            color: result.color || 'blue-purple',
             createdAt: result.created_at,
             createdBy: result.created_by
           };

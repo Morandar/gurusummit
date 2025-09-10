@@ -13,13 +13,22 @@ export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
   const { user } = useAuth();
 
   // Color schemes for visual distinction
-  const colorSchemes = [
-    'bg-gradient-to-r from-blue-600 to-purple-600',
-    'bg-gradient-to-r from-green-600 to-teal-600',
-    'bg-gradient-to-r from-red-600 to-pink-600',
-    'bg-gradient-to-r from-yellow-600 to-orange-600',
-    'bg-gradient-to-r from-indigo-600 to-cyan-600'
-  ];
+  const getColorScheme = (color: string) => {
+    switch (color) {
+      case 'blue-purple':
+        return 'bg-gradient-to-r from-blue-600 to-purple-600';
+      case 'green-teal':
+        return 'bg-gradient-to-r from-green-600 to-teal-600';
+      case 'red-pink':
+        return 'bg-gradient-to-r from-red-600 to-pink-600';
+      case 'yellow-orange':
+        return 'bg-gradient-to-r from-yellow-600 to-orange-600';
+      case 'indigo-cyan':
+        return 'bg-gradient-to-r from-indigo-600 to-cyan-600';
+      default:
+        return 'bg-gradient-to-r from-blue-600 to-purple-600';
+    }
+  };
 
   // Determine which banners to show based on user type
   const getAppropriateBanners = (): Banner[] => {
@@ -106,7 +115,7 @@ export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
   }
 
   return (
-    <div className={`${colorSchemes[currentBannerIndex % colorSchemes.length]} text-white py-2 px-4 shadow-lg border-b relative overflow-hidden`}>
+    <div className={`${getColorScheme(currentBanner?.color || 'blue-purple')} text-white py-2 px-4 shadow-lg border-b relative overflow-hidden`}>
       <div className="max-w-7xl mx-auto">
         <div className="relative">
           <div

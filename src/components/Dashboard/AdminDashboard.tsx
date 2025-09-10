@@ -64,7 +64,8 @@ export const AdminDashboard = () => {
   // Banner form states
   const [bannerForm, setBannerForm] = useState({
     text: '',
-    targetAudience: 'all' as 'all' | 'participants' | 'booth_staff'
+    targetAudience: 'all' as 'all' | 'participants' | 'booth_staff',
+    color: 'blue-purple' as 'blue-purple' | 'green-teal' | 'red-pink' | 'yellow-orange' | 'indigo-cyan'
   });
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [allBanners, setAllBanners] = useState<Banner[]>([]);
@@ -656,11 +657,32 @@ export const AdminDashboard = () => {
     }
 
     try {
-      await updateBanner(bannerForm.text, true, bannerForm.targetAudience);
-      setBannerForm({ text: '', targetAudience: 'all' });
+      // Create banner with color field
+      const { data, error } = await supabase
+        .from('banner')
+        .insert([{
+          text: bannerForm.text.trim(),
+          is_active: true,
+          target_audience: bannerForm.targetAudience,
+          color: bannerForm.color,
+          created_by: 'admin'
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ AdminDashboard: Error creating banner:', error);
+        toast({ title: 'Chyba při vytváření banneru', description: error.message });
+        return;
+      }
+
+      console.log('✅ AdminDashboard: Banner created successfully:', data);
+      // Refresh banner list
+      await loadAllBanners();
+      setBannerForm({ text: '', targetAudience: 'all', color: 'blue-purple' });
       toast({ title: 'Banner vytvořen', description: 'Banner byl úspěšně vytvořen a aktivován' });
     } catch (error) {
-      console.error('Create banner error:', error);
+      console.error('❌ AdminDashboard: Create banner error:', error);
       toast({ title: 'Chyba při vytváření banneru', description: 'Nastala neočekávaná chyba' });
     }
   };
@@ -669,7 +691,8 @@ export const AdminDashboard = () => {
     setEditingBanner(banner);
     setBannerForm({
       text: banner.text,
-      targetAudience: banner.targetAudience
+      targetAudience: banner.targetAudience,
+      color: banner.color
     });
   };
 
@@ -677,12 +700,30 @@ export const AdminDashboard = () => {
     if (!editingBanner) return;
 
     try {
-      await updateBanner(bannerForm.text, editingBanner.isActive, bannerForm.targetAudience);
+      // Update banner with color field
+      const { error } = await supabase
+        .from('banner')
+        .update({
+          text: bannerForm.text.trim(),
+          target_audience: bannerForm.targetAudience,
+          color: bannerForm.color
+        })
+        .eq('id', editingBanner.id);
+
+      if (error) {
+        console.error('❌ AdminDashboard: Error updating banner:', error);
+        toast({ title: 'Chyba při ukládání banneru', description: error.message });
+        return;
+      }
+
+      console.log('✅ AdminDashboard: Banner updated successfully');
+      // Refresh banner list
+      await loadAllBanners();
       setEditingBanner(null);
-      setBannerForm({ text: '', targetAudience: 'all' });
+      setBannerForm({ text: '', targetAudience: 'all', color: 'blue-purple' });
       toast({ title: 'Banner upraven', description: 'Změny byly uloženy' });
     } catch (error) {
-      console.error('Save banner edit error:', error);
+      console.error('❌ AdminDashboard: Save banner edit error:', error);
       toast({ title: 'Chyba při ukládání banneru', description: 'Nastala neočekávaná chyba' });
     }
   };
@@ -1357,6 +1398,26 @@ export const AdminDashboard = () => {
                       <SelectItem value="all">Všichni uživatelé</SelectItem>
                       <SelectItem value="participants">Jen účastníci</SelectItem>
                       <SelectItem value="booth_staff">Jen stánkaři</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="banner-color">Barva banneru</Label>
+                  <Select
+                    value={bannerForm.color}
+                    onValueChange={(value: 'blue-purple' | 'green-teal' | 'red-pink' | 'yellow-orange' | 'indigo-cyan') =>
+                      setBannerForm(prev => ({ ...prev, color: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vyberte barvu banneru" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="blue-purple">Modrá - Fialová</SelectItem>
+                      <SelectItem value="green-teal">Zelená - Tyrkysová</SelectItem>
+                      <SelectItem value="red-pink">Červená - Růžová</SelectItem>
+                      <SelectItem value="yellow-orange">Žlutá - Oranžová</SelectItem>
+                      <SelectItem value="indigo-cyan">Indigo - Azurová</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2303,7 +2364,7 @@ export const AdminDashboard = () => {
       <Dialog open={editingBanner !== null} onOpenChange={(open) => {
         if (!open) {
           setEditingBanner(null);
-          setBannerForm({ text: '', targetAudience: 'all' });
+          setBannerForm({ text: '', targetAudience: 'all', color: 'blue-purple' });
         }
       }}>
         <DialogContent>
@@ -2340,11 +2401,31 @@ export const AdminDashboard = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-banner-color" className="text-right">Barva banneru</Label>
+              <Select
+                value={bannerForm.color}
+                onValueChange={(value: 'blue-purple' | 'green-teal' | 'red-pink' | 'yellow-orange' | 'indigo-cyan') =>
+                  setBannerForm(prev => ({ ...prev, color: value }))
+                }
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Vyberte barvu banneru" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="blue-purple">Modrá - Fialová</SelectItem>
+                  <SelectItem value="green-teal">Zelená - Tyrkysová</SelectItem>
+                  <SelectItem value="red-pink">Červená - Růžová</SelectItem>
+                  <SelectItem value="yellow-orange">Žlutá - Oranžová</SelectItem>
+                  <SelectItem value="indigo-cyan">Indigo - Azurová</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               setEditingBanner(null);
-              setBannerForm({ text: '', targetAudience: 'all' });
+              setBannerForm({ text: '', targetAudience: 'all', color: 'blue-purple' });
             }}>
               Zrušit
             </Button>
