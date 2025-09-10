@@ -213,22 +213,60 @@ export const BoothDashboard = () => {
                   <p className="text-sm text-muted-foreground mt-2">Tento kód zadávají účastníci do své aplikace</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <Card>
-                    <CardContent className="p-4 text-center">
-                      <Users className="h-8 w-8 text-secondary mx-auto mb-2" />
-                      <div className="text-2xl font-bold">{visitors}</div>
-                      <p className="text-sm text-muted-foreground">Návštěvníků</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4 text-center">
-                      <Trophy className="h-8 w-8 text-accent mx-auto mb-2" />
-                      <div className="text-2xl font-bold">#{ranking || '-'}</div>
-                      <p className="text-sm text-muted-foreground">Umístění</p>
-                    </CardContent>
-                  </Card>
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                   <Card>
+                     <CardContent className="p-4 text-center">
+                       <Users className="h-8 w-8 text-secondary mx-auto mb-2" />
+                       <div className="text-2xl font-bold">{visitors}</div>
+                       <p className="text-sm text-muted-foreground">Návštěvníků</p>
+                     </CardContent>
+                   </Card>
+                   <Card>
+                     <CardContent className="p-4 text-center">
+                       <User className="h-8 w-8 text-primary mx-auto mb-2" />
+                       <div className="text-2xl font-bold">{users.length}</div>
+                       <p className="text-sm text-muted-foreground">Celkem účastníků</p>
+                     </CardContent>
+                   </Card>
+                   <Card>
+                     <CardContent className="p-4 text-center">
+                       <Trophy className="h-8 w-8 text-accent mx-auto mb-2" />
+                       <div className="text-2xl font-bold">#{ranking || '-'}</div>
+                       <p className="text-sm text-muted-foreground">Umístění</p>
+                     </CardContent>
+                   </Card>
+                 </div>
+
+                 {/* Visitor Progress Summary */}
+                 <Card className="mt-4">
+                   <CardContent className="p-4">
+                     <div className="text-center">
+                       <div className="text-lg font-semibold mb-2">
+                         <span className="text-primary text-2xl">{visitors}</span>
+                         <span className="text-muted-foreground"> z </span>
+                         <span className="text-foreground text-2xl">{users.length}</span>
+                         <span className="text-muted-foreground"> účastníků navštívilo váš stánek</span>
+                       </div>
+                       <Progress
+                         value={users.length > 0 ? Math.min((visitors / users.length) * 100, 100) : 0}
+                         className="w-full mt-3"
+                       />
+                       <p className="text-sm text-muted-foreground mt-2">
+                         {users.length > 0 ? Math.round(Math.min((visitors / users.length) * 100, 100)) : 0}% z celkových účastníků
+                       </p>
+                       {users.length > visitors && (
+                         <p className="text-sm text-orange-600 mt-1">
+                           Zbývá navštívit: {users.length - visitors} účastníků
+                         </p>
+                       )}
+                       {users.length === visitors && visitors > 0 && (
+                         <p className="text-sm text-green-600 mt-1">
+                           🎉 Všichni účastníci vás už navštívili!
+                         </p>
+                       )}
+                     </div>
+                   </CardContent>
+                 </Card>
               </CardContent>
             </Card>
           </TabsContent>
@@ -241,9 +279,22 @@ export const BoothDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold mb-2">{visitors}</div>
-                  <p className="text-sm text-muted-foreground mb-4">celkem návštěvníků</p>
+                  <p className="text-sm text-muted-foreground mb-2">z {users.length} registrovaných účastníků</p>
+                  <div className="text-lg font-semibold text-primary mb-4">
+                    {visitors} / {users.length} účastníků
+                  </div>
                   <Progress value={users.length > 0 ? Math.min((visitors / users.length) * 100, 100) : 0} className="w-full" />
                   <p className="text-xs text-muted-foreground mt-2">{users.length > 0 ? Math.round(Math.min((visitors / users.length) * 100, 100)) : 0}% návštěvnosti</p>
+                  {users.length > visitors && (
+                    <p className="text-sm text-orange-600 mt-2">
+                      Zbývá: {users.length - visitors} účastníků
+                    </p>
+                  )}
+                  {users.length === visitors && visitors > 0 && (
+                    <p className="text-sm text-green-600 mt-2">
+                      🎉 Kompletní návštěvnost!
+                    </p>
+                  )}
                 </CardContent>
               </Card>
               <Card>
