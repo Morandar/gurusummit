@@ -9,7 +9,17 @@ interface ScrollingBannerProps {
 export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
   const [scrollPosition, setScrollPosition] = useState(100);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const { user } = useAuth();
+
+  // Color schemes for visual distinction
+  const colorSchemes = [
+    'bg-gradient-to-r from-blue-600 to-purple-600',
+    'bg-gradient-to-r from-green-600 to-teal-600',
+    'bg-gradient-to-r from-red-600 to-pink-600',
+    'bg-gradient-to-r from-yellow-600 to-orange-600',
+    'bg-gradient-to-r from-indigo-600 to-cyan-600'
+  ];
 
   // Determine which banners to show based on user type
   const getAppropriateBanners = (): Banner[] => {
@@ -55,17 +65,6 @@ export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
     targetAudience: currentBanner.targetAudience
   } : 'null');
 
-  // Rotate through banners every 8 seconds
-  useEffect(() => {
-    if (appropriateBanners.length <= 1) return;
-
-    const rotationInterval = setInterval(() => {
-      setCurrentBannerIndex(prev => (prev + 1) % appropriateBanners.length);
-      setScrollPosition(100); // Reset scroll position when changing banner
-    }, 8000); // Change banner every 8 seconds
-
-    return () => clearInterval(rotationInterval);
-  }, [appropriateBanners.length]);
 
   useEffect(() => {
     if (!currentBanner?.text) {
@@ -77,12 +76,22 @@ export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
 
     const interval = setInterval(() => {
       setScrollPosition(prev => {
+        if (isPaused) return prev; // Don't move if paused
+
         // Move from right to left (negative values)
         const newPosition = prev - 1;
 
-        // Reset when text has scrolled completely off screen
+        // When text has scrolled completely off screen, pause and switch
         if (newPosition < -800) { // Adjust based on text length
-          return 100; // Reset to start from right
+          setIsPaused(true);
+          setTimeout(() => {
+            if (appropriateBanners.length > 1) {
+              setCurrentBannerIndex(prev => (prev + 1) % appropriateBanners.length);
+            }
+            setScrollPosition(100); // Reset to start from right
+            setIsPaused(false);
+          }, 2000); // 2 second pause before next banner
+          return prev; // Keep current position during pause
         }
 
         return newPosition;
@@ -90,14 +99,14 @@ export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
     }, 30); // Smoother animation with 30ms intervals
 
     return () => clearInterval(interval);
-  }, [currentBanner?.text]);
+  }, [currentBanner?.text, isPaused, appropriateBanners.length]);
 
   if (!currentBanner?.text) {
     return null;
   }
 
   return (
-    <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 shadow-lg border-b relative overflow-hidden">
+    <div className={`${colorSchemes[currentBannerIndex % colorSchemes.length]} text-white py-2 px-4 shadow-lg border-b relative overflow-hidden`}>
       <div className="max-w-7xl mx-auto">
         <div className="relative">
           <div
