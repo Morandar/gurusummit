@@ -1,22 +1,25 @@
-# Welcome to your Lovable project
+# O2 Guru Summit 2025 - Gamified Hub
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/6516af07-6150-4ef8-bcb5-a63a510c1de0
+**Repository**: https://github.com/Morandar/gurusummit
+**Live URL**: Deployed on Vercel
 
 ## How can I edit this code?
 
 There are several ways of editing your application.
 
-**Use Lovable**
+**Use GitHub Codespaces**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/6516af07-6150-4ef8-bcb5-a63a510c1de0) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
+- Navigate to the main page of your repository.
+- Click on the "Code" button (green button) near the top right.
+- Select the "Codespaces" tab.
+- Click on "New codespace" to launch a new Codespace environment.
+- Edit files directly within the Codespace and commit and push your changes once you're done.
 
 **Use your preferred IDE**
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will automatically trigger deployment on Vercel.
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
@@ -54,20 +57,69 @@ npm run dev
 
 This project is built with:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- **Vite** - Fast build tool and development server
+- **TypeScript** - Type-safe JavaScript
+- **React** - UI library with hooks
+- **shadcn-ui** - Modern UI components
+- **Tailwind CSS** - Utility-first CSS framework
+- **Supabase** - Backend as a service (database, auth, real-time)
+- **React Router** - Client-side routing
+- **React Query** - Data fetching and caching
+- **Capacitor** - Cross-platform mobile app development
+
+## Project Structure
+
+```
+src/
+├── components/          # Reusable UI components
+│   ├── Auth/           # Authentication components
+│   ├── Dashboard/      # Admin and user dashboards
+│   ├── Modals/         # Modal dialogs
+│   ├── Profile/        # User profile components
+│   └── ui/             # shadcn-ui components
+├── context/            # React context providers
+├── hooks/              # Custom React hooks
+├── lib/                # Utility libraries and configurations
+├── pages/              # Page components
+└── assets/             # Static assets
+```
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/6516af07-6150-4ef8-bcb5-a63a510c1de0) and click on Share -> Publish.
+This project is automatically deployed on Vercel when changes are pushed to the main branch on GitHub.
 
-## Can I connect a custom domain to my Lovable project?
+### Manual Deployment
 
-Yes, you can!
+If you need to deploy manually:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+1. Connect your GitHub repository to Vercel
+2. Push changes to the main branch
+3. Vercel will automatically build and deploy the application
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### Environment Variables
+
+Make sure to set the following environment variables in Vercel:
+
+- `VITE_SUPABASE_URL` - Your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Your Supabase anonymous key
+
+## Can I connect a custom domain?
+
+Yes, you can connect a custom domain to your Vercel deployment!
+
+### Connecting a Custom Domain on Vercel
+
+1. Go to your Vercel dashboard
+2. Select your project
+3. Go to Settings > Domains
+4. Click "Add" and enter your custom domain
+5. Follow Vercel's instructions to configure DNS settings
+
+### Environment Variables
+
+Make sure to set the following environment variables in Vercel:
+
+- `VITE_SUPABASE_URL` - Your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Your Supabase anonymous key
+
+Read more in the [Vercel documentation](https://vercel.com/docs/concepts/projects/domains/add-a-domain)
