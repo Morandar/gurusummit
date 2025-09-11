@@ -125,7 +125,7 @@ export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
               transition: 'none'
             }}
           >
-            📢 {currentBanner.text} 📢 {currentBanner.text} 📢 {currentBanner.text} 📢 {currentBanner.text} 📢 {currentBanner.text}
+            📢&nbsp;&nbsp;&nbsp;{currentBanner.text}&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;{currentBanner.text}&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;{currentBanner.text}&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;{currentBanner.text}&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;{currentBanner.text}&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
           </div>
           {/* Banner indicator for multiple banners */}
           {appropriateBanners.length > 1 && (
