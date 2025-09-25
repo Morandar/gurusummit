@@ -134,17 +134,28 @@ BEGIN
     END LOOP;
 END $$;
 
--- For event app with public access, disable RLS to avoid performance issues
--- Service role key provides security through API authentication
-ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.booths DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.program DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.visits DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.winners DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.banner DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.discounted_phones DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;
+-- Enable RLS with permissive policies for PostgREST compatibility
+-- Service role key provides security, but RLS policies ensure PostgREST works correctly
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.booths ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.program ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.visits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.winners ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.banner ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.discounted_phones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
+
+-- Create policies that allow all operations (service role key handles security)
+CREATE POLICY "allow_all_operations_users" ON public.users FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_operations_booths" ON public.booths FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_operations_program" ON public.program FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_operations_visits" ON public.visits FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_operations_winners" ON public.winners FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_operations_notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_operations_banner" ON public.banner FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_operations_discounted_phones" ON public.discounted_phones FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_operations_settings" ON public.settings FOR ALL USING (true) WITH CHECK (true);
 
 -- Note: Sample data inserts removed to avoid ON CONFLICT issues
 -- You can add sample data manually through the admin interface after the tables are created
