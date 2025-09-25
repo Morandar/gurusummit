@@ -155,49 +155,7 @@ CREATE POLICY "Allow all operations on discounted_phones" ON public.discounted_p
 -- Settings table policies
 CREATE POLICY "Allow all operations on settings" ON public.settings FOR ALL USING (true) WITH CHECK (true);
 
--- Insert default settings if they don't exist
-INSERT INTO public.settings (key, value) VALUES
-    ('codeTimeSettings', '{"startTime": "09:00", "endTime": "17:00", "enabled": false}'),
-    ('homePageTexts', '{
-        "title": "O2 Guru Summit 2025",
-        "subtitle": "Nejdůležitější technologický event roku",
-        "description": "Sbírejte body návštěvou stánků a získejte hodnotné ceny",
-        "loginTitle": "Přihlaste se do aplikace",
-        "loginDescription": "Získejte přístup k interaktivní mapě stánků, sledujte svůj pokrok a nezmeškejte žádnou část programu.",
-        "benefitsTitle": "🎯 Co vás čeká?",
-        "benefits": [
-            "17 interaktivních stánků s nejnovějšími technologiemi",
-            "Sběr bodů za návštěvy stánků",
-            "Živý program s časovačem",
-            "Hodnotné ceny pro nejaktivnější účastníky"
-        ],
-        "prizesTitle": "🏆 Soutěžte o ceny",
-        "prizesDescription": "Navštivte všechny stánky a získejte šanci vyhrát nejnovější technologie a exkluzivní O2 produkty."
-    }')
-ON CONFLICT (key) DO NOTHING;
-
--- Insert some sample data for testing (optional)
--- You can remove these INSERT statements if you don't want sample data
-
--- Sample booths
-INSERT INTO public.booths (name, code, login, password, category) VALUES
-    ('O2 Telekomunikace', 'O2TEL', 'admin', 'password123', 'telecom'),
-    ('O2 Mobilní sítě', 'O2NET', 'admin', 'password123', 'network'),
-    ('O2 Internet', 'O2INT', 'admin', 'password123', 'internet'),
-    ('O2 TV', 'O2TV', 'admin', 'password123', 'entertainment')
-ON CONFLICT (code) DO NOTHING;
-
--- Sample program
-INSERT INTO public.program (id, time, event, duration, category) VALUES
-    (1, '09:00', 'Registrace účastníků', 60, 'ceremony'),
-    (2, '10:00', 'Úvodní přednáška', 45, 'lecture'),
-    (3, '10:45', 'Přestávka na kávu', 15, 'break'),
-    (4, '11:00', 'Workshop: Budoucnost telekomunikací', 60, 'workshop')
-ON CONFLICT (id) DO NOTHING;
-
--- Sample notifications
-INSERT INTO public.notifications (title, message, target_audience, created_by) VALUES
-    ('Vítejte na O2 Guru Summitu!', 'Začínáme registrací účastníků. Najděte svůj stánek a začněte sbírat body!', 'all', 'admin'),
-    ('Připomínka: Registrace končí v 9:00', 'Ujistěte se, že jste registrovaní před začátkem programu.', 'participants', 'admin');
+-- Note: Sample data inserts removed to avoid ON CONFLICT issues
+-- You can add sample data manually through the admin interface after the tables are created
 
 COMMIT;
