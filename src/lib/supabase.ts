@@ -8,6 +8,7 @@ export const supabase = createClient(url, key, {
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
     },
   },
 });
