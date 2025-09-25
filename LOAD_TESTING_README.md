@@ -34,9 +34,16 @@ sudo apt update
 sudo apt install k6
 ```
 
-### Nebo globálně přes npm
+### Docker (univerzální)
 ```bash
-npm install -g k6
+# Spuštění testu v Docker kontejneru
+docker run --rm -v $(pwd):/scripts -i grafana/k6 run /scripts/load_test_api.js
+```
+
+### Ověření instalace
+```bash
+k6 version
+# Expected output: k6 v0.48.0 (or newer)
 ```
 
 ## ⚙️ Nastavení prostředí
