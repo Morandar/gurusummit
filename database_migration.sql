@@ -116,6 +116,24 @@ CREATE INDEX IF NOT EXISTS idx_banner_is_active ON public.banner(is_active);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_winners_wonat ON public.winners(wonat DESC);
 
+-- Clean up: Drop all existing RLS policies before disabling RLS
+-- This resolves database linter errors about policies existing when RLS is disabled
+DO $$
+DECLARE
+    policy_record RECORD;
+BEGIN
+    -- Drop all policies on our tables
+    FOR policy_record IN
+        SELECT schemaname, tablename, policyname
+        FROM pg_policies
+        WHERE schemaname = 'public'
+        AND tablename IN ('users', 'booths', 'program', 'visits', 'winners', 'notifications', 'banner', 'discounted_phones', 'settings')
+    LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I',
+                      policy_record.policyname, policy_record.schemaname, policy_record.tablename);
+    END LOOP;
+END $$;
+
 -- For event app with public access, disable RLS to avoid performance issues
 -- Service role key provides security through API authentication
 ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
