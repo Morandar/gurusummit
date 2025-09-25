@@ -8,7 +8,9 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "loadtest": "k6 run load_test_api.js",
+    "loadtest:ci": "k6 run --out json=results.json load_test_api.js"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.2",
@@ -80,6 +82,7 @@
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
+    "k6": "^0.49.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
