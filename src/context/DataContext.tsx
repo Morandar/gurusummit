@@ -350,7 +350,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const fetchUsers = async (totalBooths?: number) => {
     const { data, error } = await supabase.from('users').select('*').order('id');
     if (!error && data) {
-      console.log('Fetched users from DB:', data); // Debug log to see actual structure
       const mappedUsers = await Promise.all(data.map(async (user: any) => {
         // Get user's visits from visits table
         const { data: userVisits } = await supabase
@@ -402,11 +401,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const fetchProgram = async () => {
-    console.log('🔄 DataContext: Fetching program from Supabase...');
     const { data, error } = await supabase.from('program').select('*').order('time');
     if (!error && data) {
-      console.log('✅ DataContext: Fetched program events:', data.length);
-      console.log('📋 DataContext: Program categories check:', data.map(item => ({ event: item.event, category: item.category })));
       setProgram(data as any);
     } else if (error) {
       console.error('❌ DataContext: Error fetching program:', error);
@@ -456,13 +452,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const fetchBanner = async () => {
-    console.log('🔄 DataContext: Fetching active banners from Supabase...');
     const startTime = Date.now();
 
     // Check authentication status
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      console.log('🔐 DataContext: Auth session check:', {
         hasSession: !!sessionData?.session,
         userEmail: sessionData?.session?.user?.email || 'none',
         expiresAt: sessionData?.session?.expires_at ? new Date(sessionData.session.expires_at * 1000).toISOString() : 'none'
@@ -474,7 +468,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data, error } = await supabase.from('banner').select('*').eq('is_active', true);
       const fetchTime = Date.now() - startTime;
-      console.log(`⏱️ DataContext: Banner fetch took ${fetchTime}ms`);
 
       if (error) {
         console.error('❌ DataContext: Supabase error fetching banners:', {
@@ -497,9 +490,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data && data.length > 0) {
-        console.log('✅ DataContext: Fetched active banners:', data.length, 'banners');
         data.forEach((banner, index) => {
-          console.log(`📢 Banner ${index + 1}:`, {
             id: banner.id,
             text: banner.text.substring(0, 50) + (banner.text.length > 50 ? '...' : ''),
             isActive: banner.is_active,
@@ -520,15 +511,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         }));
 
         setBanners(bannerData);
-        console.log('✅ DataContext: Active banners set in state successfully');
 
         // For backward compatibility, set the first banner as the main banner
         if (bannerData.length > 0) {
           setBanner(bannerData[0]);
-          console.log('✅ DataContext: Main banner set to first active banner');
         }
       } else {
-        console.log('ℹ️ DataContext: No active banners found');
         setBanners([]);
         setBanner(null);
       }
@@ -555,7 +543,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const fetchAllBanners = async () => {
-    console.log('🔄 DataContext: Fetching all banners from Supabase...');
     try {
       const { data, error } = await supabase.from('banner').select('*').order('created_at', { ascending: false });
 
@@ -565,7 +552,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data) {
-        console.log('✅ DataContext: Fetched all banners:', data.length, 'banners');
         const mappedBanners = data.map((banner: any) => ({
           id: banner.id,
           text: banner.text,
@@ -577,7 +563,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         }));
         return mappedBanners;
       } else {
-        console.log('ℹ️ DataContext: No banners data returned');
         return [];
       }
     } catch (error) {
@@ -587,10 +572,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const fetchNotifications = async () => {
-    console.log('🔄 DataContext: Fetching notifications from Supabase...');
     const { data, error } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
     if (!error && data) {
-      console.log('✅ DataContext: Fetched notifications:', data.length, 'notifications');
       const mappedNotifications = data.map((notification: any) => ({
         id: notification.id,
         title: notification.title,
@@ -629,10 +612,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       if (!homePageError && homePageData?.value) {
         const parsedHomePage = JSON.parse(homePageData.value);
-        console.log('🔄 DataContext: Fetched homePageTexts from Supabase:', parsedHomePage);
         setHomePageTextsState(parsedHomePage);
       } else {
-        console.log('⚠️ DataContext: No homePageTexts found in Supabase, using defaults');
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -642,7 +623,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      console.log('🚀 DataContext: Starting data fetch...');
       try {
         const { data: boothsData } = await supabase.from('booths').select('*').order('id');
         const totalBooths = boothsData?.length || 0;
@@ -655,28 +635,23 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         await fetchWinners(); // Fetch winners from database
         await fetchDiscountedPhones(); // Fetch discounted phones from database
         await fetchSettings(); // Fetch settings from database
-        console.log('✅ DataContext: All data fetched successfully');
       } catch (error) {
         console.error('❌ DataContext: Error fetching data:', error);
       } finally {
-        console.log('🏁 DataContext: Setting isLoading to false');
         setIsLoading(false);
       }
     };
     fetchData();
 
     // Set up periodic banner check every 30 seconds
-    console.log('📢 DataContext: Setting up banner polling every 30 seconds');
     let pollCount = 0;
     const bannerInterval = setInterval(() => {
       pollCount++;
-      console.log(`🔄 DataContext: Banner poll #${pollCount} - checking for updates`);
       fetchBanner();
     }, 30000); // Check every 30 seconds
 
     // Cleanup interval on unmount
     return () => {
-      console.log('🧹 DataContext: Cleaning up banner polling after', pollCount, 'polls');
       clearInterval(bannerInterval);
     };
   }, []);
@@ -962,19 +937,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
       // This would typically update a user_notifications table
       // For now, we'll just log it
-      console.log(`Notification ${notificationId} marked as read by user ${userId}`);
     } catch (error) {
       console.error('Mark notification as read error:', error);
     }
   };
 
   const updateBanner = async (text: string, isActive: boolean, targetAudience: 'all' | 'participants' | 'booth_staff' = 'all', bannerId?: number) => {
-    console.log('📢 DataContext: Updating banner:', { text, isActive, targetAudience, bannerId });
     try {
       if (isActive && text.trim()) {
         // If we have a bannerId, use it to update the specific banner
         if (bannerId) {
-          console.log('🔄 DataContext: Reactivating existing banner by ID:', bannerId);
           const { data, error } = await supabase
             .from('banner')
             .update({
@@ -1002,7 +974,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
               createdBy: data.created_by
             };
 
-            console.log('✅ DataContext: Banner reactivated successfully:', updatedBanner);
             // Update the banners array
             setBanners(prev => prev.map(b => b.id === bannerId ? updatedBanner : b));
             // For backward compatibility, set as main banner if it's the first one
@@ -1030,7 +1001,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         let result;
         if (existingBanner) {
           // Update existing banner to active
-          console.log('🔄 DataContext: Reactivating existing banner:', existingBanner.id);
           const { data, error } = await supabase
             .from('banner')
             .update({
@@ -1049,7 +1019,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           result = data;
         } else {
           // Create new banner only if explicitly requested (no bannerId provided)
-          console.log('➕ DataContext: Creating new banner');
           const { data, error } = await supabase
             .from('banner')
             .insert([{
@@ -1080,7 +1049,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             createdBy: result.created_by
           };
 
-          console.log('✅ DataContext: Banner updated successfully:', updatedBanner);
           // Add to banners array
           setBanners(prev => [...prev, updatedBanner]);
           // For backward compatibility, set as main banner if it's the first one
@@ -1105,7 +1073,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        console.log('✅ DataContext: Banner deactivated');
         // Remove from banners array
         if (bannerId) {
           setBanners(prev => prev.filter(b => b.id !== bannerId));

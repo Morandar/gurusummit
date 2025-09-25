@@ -7,7 +7,7 @@ import { AdminDashboard } from '@/components/Dashboard/AdminDashboard';
 import heroImage from '@/assets/hero-summit.jpg';
 
 const Index = () => {
-  const { user, login, logout, isLoading } = useAuth();
+  const { user, login, logout, setUserFromStorage, isLoading } = useAuth();
   const { homePageTexts, registerParticipant, loginParticipant, isLoading: dataLoading } = useData();
 
   const handleLogin = async (userType: 'participant' | 'booth' | 'admin', credentials: any) => {
@@ -42,7 +42,7 @@ const Index = () => {
             };
             // Save to localStorage and set user state
             localStorage.setItem('authUser', JSON.stringify(authUser));
-            window.location.reload(); // Force refresh to load user
+            setUserFromStorage(); // Update auth state without reload
             return true;
           }
         }
@@ -62,7 +62,7 @@ const Index = () => {
           };
           // Save to localStorage and set user state
           localStorage.setItem('authUser', JSON.stringify(authUser));
-          window.location.reload(); // Force refresh to load user
+          setUserFromStorage(); // Update auth state without reload
           return true;
         }
         return false;
@@ -181,8 +181,6 @@ const Index = () => {
     );
   }
 
-  // Debug: log current user
-  console.log('Current user:', user);
 
   // Route to appropriate dashboard based on user type
   if (user.type === 'participant') {
@@ -191,7 +189,7 @@ const Index = () => {
         user={user} 
         onLogout={logout} 
         onUserUpdate={() => {
-          console.log('User update called');
+          // User update callback
         }}
       />;
     } catch (error) {

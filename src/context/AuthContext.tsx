@@ -36,6 +36,7 @@ interface AuthContextType {
   user: User | null;
   login: (userType: 'participant' | 'booth' | 'admin', credentials: any) => Promise<boolean>;
   logout: () => void;
+  setUserFromStorage: () => void;
   isLoading: boolean;
 }
 
@@ -238,8 +239,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const setUserFromStorage = () => {
+    try {
+      const storedUser = localStorage.getItem('authUser');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        if (parsedUser && (parsedUser.type === 'participant' || parsedUser.type === 'booth')) {
+          setUser(parsedUser);
+          (window as any).__authUser = parsedUser;
+        }
+      }
+    } catch (error) {
+      console.error('Error setting user from storage:', error);
+      localStorage.removeItem('authUser');
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, setUserFromStorage, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

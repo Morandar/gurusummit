@@ -29,7 +29,6 @@ export const AdminDashboard = () => {
     resetAllProgress, removeUserProfileImage, addUserByAdmin, updateBanner, fetchAllBanners
   } = useData();
 
-  console.log('🎛️ AdminDashboard: Current banner state:', banner);
   const isLoading = false; // Temporary fix for TS cache issue
   const { toast } = useToast();
   const [timeToNext, setTimeToNext] = useState(0);
@@ -123,7 +122,6 @@ export const AdminDashboard = () => {
 
   // Load all banners when component mounts
   useEffect(() => {
-    console.log('🎛️ AdminDashboard: Loading all banners on mount');
     loadAllBanners();
   }, []);
 
@@ -676,7 +674,6 @@ export const AdminDashboard = () => {
         return;
       }
 
-      console.log('✅ AdminDashboard: Banner created successfully:', data);
       // Refresh banner list
       await loadAllBanners();
       setBannerForm({ text: '', targetAudience: 'all', color: 'blue-purple' });
@@ -716,7 +713,6 @@ export const AdminDashboard = () => {
         return;
       }
 
-      console.log('✅ AdminDashboard: Banner updated successfully');
       // Refresh banner list
       await loadAllBanners();
       setEditingBanner(null);
@@ -729,7 +725,6 @@ export const AdminDashboard = () => {
   };
 
   const handleDeleteBanner = async (bannerId: number) => {
-    console.log('🗑️ AdminDashboard: Deleting banner with ID:', bannerId);
     try {
       // Delete banner from Supabase
       const { error } = await supabase.from('banner').delete().eq('id', bannerId);
@@ -740,14 +735,11 @@ export const AdminDashboard = () => {
         return;
       }
 
-      console.log('✅ AdminDashboard: Banner deleted from Supabase successfully');
       // Refresh the banner list after deletion
-      console.log('🔄 AdminDashboard: Refreshing banner list after deletion');
       await loadAllBanners();
 
       // If the deleted banner was active, also refresh the active banner
       if (banner && banner.id === bannerId) {
-        console.log('🔄 AdminDashboard: Deleted banner was active, refreshing page to update active banner state');
         // This will trigger a refetch of the active banner
         window.location.reload(); // Simple way to refresh the active banner state
       }
@@ -760,7 +752,6 @@ export const AdminDashboard = () => {
   };
 
   const handleToggleBanner = async (banner: Banner, isActive: boolean) => {
-    console.log('🎛️ AdminDashboard: Toggling banner:', {
       id: banner.id,
       text: banner.text.substring(0, 30) + (banner.text.length > 30 ? '...' : ''),
       fromActive: banner.isActive,
@@ -768,13 +759,11 @@ export const AdminDashboard = () => {
     });
     try {
       await updateBanner(banner.text, isActive, banner.targetAudience, banner.id);
-      console.log('✅ AdminDashboard: Banner toggle successful');
       toast({
         title: isActive ? 'Banner aktivován' : 'Banner deaktivován',
         description: `Banner byl ${isActive ? 'aktivován' : 'deaktivován'}`
       });
       // Refresh the banner list after toggling
-      console.log('🔄 AdminDashboard: Refreshing banner list after toggle');
       await loadAllBanners();
     } catch (error) {
       console.error('❌ AdminDashboard: Toggle banner error:', error);
@@ -784,10 +773,7 @@ export const AdminDashboard = () => {
 
   const loadAllBanners = async () => {
     try {
-      console.log('🎛️ AdminDashboard: Calling fetchAllBanners()');
       const banners = await fetchAllBanners();
-      console.log('🎛️ AdminDashboard: fetchAllBanners() returned:', banners.length, 'banners');
-      console.log('🎛️ AdminDashboard: Banner details:', banners.map(b => ({
         id: b.id,
         text: b.text.substring(0, 30) + (b.text.length > 30 ? '...' : ''),
         isActive: b.isActive,
@@ -800,7 +786,6 @@ export const AdminDashboard = () => {
       // Then set the fresh data
       setTimeout(() => {
         setAllBanners(banners);
-        console.log('🎛️ AdminDashboard: allBanners state updated with', banners.length, 'banners');
       }, 0);
 
     } catch (error) {
@@ -1476,7 +1461,6 @@ export const AdminDashboard = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      console.log('🔄 AdminDashboard: Manual banner refresh triggered');
                       loadAllBanners();
                     }}
                   >
@@ -1493,7 +1477,6 @@ export const AdminDashboard = () => {
                     </div>
                   ) : (
                     allBanners.map((bannerItem) => {
-                      console.log('🎛️ AdminDashboard: Rendering banner:', {
                         id: bannerItem.id,
                         text: bannerItem.text.substring(0, 30) + (bannerItem.text.length > 30 ? '...' : ''),
                         isActive: bannerItem.isActive,

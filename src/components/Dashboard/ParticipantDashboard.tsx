@@ -399,8 +399,6 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                     const categoryInfo = getCategoryInfo(item.category || 'lecture');
                     const CategoryIcon = categoryInfo.icon;
 
-                    // Debug log for program categories
-                    console.log('📅 ParticipantDashboard: Program item:', item.event, 'Category:', item.category, 'CategoryInfo:', categoryInfo);
 
                     return (
                       <div
