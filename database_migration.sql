@@ -116,44 +116,17 @@ CREATE INDEX IF NOT EXISTS idx_banner_is_active ON public.banner(is_active);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_winners_wonat ON public.winners(wonat DESC);
 
--- Enable Row Level Security (RLS) on all tables
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.booths ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.program ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.visits ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.winners ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.banner ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.discounted_phones ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
-
--- Create policies for public access (since this is an event app)
--- Users table policies
-CREATE POLICY "Allow all operations on users" ON public.users FOR ALL USING (true) WITH CHECK (true);
-
--- Booths table policies
-CREATE POLICY "Allow all operations on booths" ON public.booths FOR ALL USING (true) WITH CHECK (true);
-
--- Program table policies
-CREATE POLICY "Allow all operations on program" ON public.program FOR ALL USING (true) WITH CHECK (true);
-
--- Visits table policies
-CREATE POLICY "Allow all operations on visits" ON public.visits FOR ALL USING (true) WITH CHECK (true);
-
--- Winners table policies
-CREATE POLICY "Allow all operations on winners" ON public.winners FOR ALL USING (true) WITH CHECK (true);
-
--- Notifications table policies
-CREATE POLICY "Allow all operations on notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
-
--- Banner table policies
-CREATE POLICY "Allow all operations on banner" ON public.banner FOR ALL USING (true) WITH CHECK (true);
-
--- Discounted phones table policies
-CREATE POLICY "Allow all operations on discounted_phones" ON public.discounted_phones FOR ALL USING (true) WITH CHECK (true);
-
--- Settings table policies
-CREATE POLICY "Allow all operations on settings" ON public.settings FOR ALL USING (true) WITH CHECK (true);
+-- For event app with public access, disable RLS to avoid performance issues
+-- This is safe since we're allowing all operations and using API keys for access control
+ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.booths DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.program DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.visits DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.winners DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.banner DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.discounted_phones DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;
 
 -- Note: Sample data inserts removed to avoid ON CONFLICT issues
 -- You can add sample data manually through the admin interface after the tables are created
