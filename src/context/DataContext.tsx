@@ -457,6 +457,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     // Check authentication status
     try {
       const { data: sessionData } = await supabase.auth.getSession();
+      console.log({
         hasSession: !!sessionData?.session,
         userEmail: sessionData?.session?.user?.email || 'none',
         expiresAt: sessionData?.session?.expires_at ? new Date(sessionData.session.expires_at * 1000).toISOString() : 'none'
@@ -490,16 +491,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data && data.length > 0) {
-        data.forEach((banner, index) => {
-            id: banner.id,
-            text: banner.text.substring(0, 50) + (banner.text.length > 50 ? '...' : ''),
-            isActive: banner.is_active,
-            targetAudience: banner.target_audience,
-            createdAt: banner.created_at,
-            createdBy: banner.created_by
-          });
-        });
-
         const bannerData = data.map((banner: any) => ({
           id: banner.id,
           text: banner.text,

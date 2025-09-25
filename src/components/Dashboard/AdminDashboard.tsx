@@ -752,6 +752,7 @@ export const AdminDashboard = () => {
   };
 
   const handleToggleBanner = async (banner: Banner, isActive: boolean) => {
+    console.log({
       id: banner.id,
       text: banner.text.substring(0, 30) + (banner.text.length > 30 ? '...' : ''),
       fromActive: banner.isActive,
@@ -774,11 +775,14 @@ export const AdminDashboard = () => {
   const loadAllBanners = async () => {
     try {
       const banners = await fetchAllBanners();
+      setAllBanners(banners.map(b => ({
         id: b.id,
         text: b.text.substring(0, 30) + (b.text.length > 30 ? '...' : ''),
         isActive: b.isActive,
         targetAudience: b.targetAudience,
-        createdAt: b.createdAt
+        color: b.color,
+        createdAt: b.createdAt,
+        createdBy: b.createdBy
       })));
 
       // Clear any potential cached data
@@ -1476,21 +1480,15 @@ export const AdminDashboard = () => {
                       <p>Žádné bannery nejsou k dispozici</p>
                     </div>
                   ) : (
-                    allBanners.map((bannerItem) => {
-                        id: bannerItem.id,
-                        text: bannerItem.text.substring(0, 30) + (bannerItem.text.length > 30 ? '...' : ''),
-                        isActive: bannerItem.isActive,
-                        targetAudience: bannerItem.targetAudience
-                      });
-                      return (
-                        <div
-                          key={bannerItem.id}
-                          className={`flex items-center justify-between p-4 border rounded-lg ${
-                            bannerItem.isActive
-                              ? 'bg-green-50 border-green-200'
-                              : 'bg-gray-50 border-gray-200'
-                          }`}
-                        >
+                    allBanners.map((bannerItem) => (
+                      <div
+                        key={bannerItem.id}
+                        className={`flex items-center justify-between p-4 border rounded-lg ${
+                          bannerItem.isActive
+                            ? 'bg-green-50 border-green-200'
+                            : 'bg-gray-50 border-gray-200'
+                        }`}
+                      >
                         <div className="flex-1">
                           <div className="font-medium">{bannerItem.text}</div>
                           <div className="text-sm text-muted-foreground">
@@ -1525,8 +1523,7 @@ export const AdminDashboard = () => {
                           </Button>
                         </div>
                       </div>
-                      );
-                    })
+                    ))
                   )}
                 </div>
               </CardContent>
