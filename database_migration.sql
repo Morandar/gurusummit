@@ -198,7 +198,6 @@ ON CONFLICT (id) DO NOTHING;
 -- Sample notifications
 INSERT INTO public.notifications (title, message, target_audience, created_by) VALUES
     ('Vítejte na O2 Guru Summitu!', 'Začínáme registrací účastníků. Najděte svůj stánek a začněte sbírat body!', 'all', 'admin'),
-    ('Připomínka: Registrace končí v 9:00', 'Ujistěte se, že jste registrovaní před začátkem programu.', 'participants', 'admin')
-ON CONFLICT DO NOTHING;
+    ('Připomínka: Registrace končí v 9:00', 'Ujistěte se, že jste registrovaní před začátkem programu.', 'participants', 'admin');
 
 COMMIT;
