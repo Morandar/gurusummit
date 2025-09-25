@@ -9,6 +9,8 @@ export const supabase = createClient(url, key, {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
       'Prefer': 'return=representation',
+      'Accept-Profile': 'public',
+      'Content-Profile': 'public',
     },
   },
 });
