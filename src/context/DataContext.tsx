@@ -352,14 +352,24 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     if (!error && data) {
       const mappedUsers = await Promise.all(data.map(async (user: any) => {
         // Get user's visits from visits table
-        const { data: userVisits } = await supabase
-          .from('visits')
-          .select('booth_id')
-          .eq('attendee_id', user.id);
-        
-        const visitedBooths = userVisits?.map((visit: any) => visit.booth_id) || [];
+        let visitedBooths: number[] = [];
+        try {
+          const { data: userVisits, error: visitsError } = await supabase
+            .from('visits')
+            .select('booth_id')
+            .eq('attendee_id', user.id);
+
+          if (!visitsError && userVisits) {
+            visitedBooths = userVisits.map((visit: any) => visit.booth_id);
+          } else {
+            console.warn('Could not fetch visits for user:', user.id, visitsError);
+          }
+        } catch (visitsError) {
+          console.warn('Error fetching visits for user:', user.id, visitsError);
+        }
+
         const boothCount = totalBooths || booths.length;
-        
+
         return {
           id: user.id,
           personalNumber: user.personalnumber,
@@ -385,17 +395,28 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     if (!error && data) {
       // Calculate visits for each booth from visits table
       const boothsWithVisits = await Promise.all(data.map(async (booth: any) => {
-        const { count } = await supabase
-          .from('visits')
-          .select('*', { count: 'exact', head: true })
-          .eq('booth_id', booth.id);
-        
+        let visitCount = 0;
+        try {
+          const { count, error: countError } = await supabase
+            .from('visits')
+            .select('*', { count: 'exact', head: true })
+            .eq('booth_id', booth.id);
+
+          if (!countError) {
+            visitCount = count || 0;
+          } else {
+            console.warn('Could not fetch visit count for booth:', booth.id, countError);
+          }
+        } catch (countError) {
+          console.warn('Error fetching visit count for booth:', booth.id, countError);
+        }
+
         return {
           ...booth,
-          visits: count || 0
+          visits: visitCount
         };
       }));
-      
+
       setBooths(boothsWithVisits as any);
     }
   };
@@ -660,30 +681,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Temporarily use admin auth for database operations to bypass RLS
-      const currentSession = await supabase.auth.getSession();
-      
-      // Check if user already visited this booth in database
-      const { data: existingVisit, error: checkError } = await supabase
-        .from('visits')
-        .select('id')
-        .eq('booth_id', boothId)
-        .eq('attendee_id', userId)
-        .single();
-
-      if (checkError && checkError.code !== 'PGRST116') {
-        // Error other than "not found"
-        console.error('Error checking visit:', checkError);
-        toast({ title: 'Chyba při kontrole návštěvy', description: checkError.message });
-        return;
-      }
-
-      if (existingVisit) {
-        toast({ title: 'Již navštíveno', description: 'Tento stánek jste již navštívili.' });
-        return;
-      }
-
-      // Insert new visit into database
+      // Try to insert new visit into database
+      // If it already exists, the unique constraint will be violated
       const { error: insertError } = await supabase
         .from('visits')
         .insert([{
@@ -693,6 +692,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         }]);
 
       if (insertError) {
+        // Check if it's a unique constraint violation (user already visited this booth)
+        if (insertError.code === '23505') { // PostgreSQL unique constraint violation
+          toast({ title: 'Již navštíveno', description: 'Tento stánek jste již navštívili.' });
+          return;
+        }
+
         console.error('Error inserting visit:', insertError);
         toast({ title: 'Chyba při ukládání návštěvy', description: insertError.message });
         return;
@@ -738,11 +743,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         .from('visits')
         .delete()
         .neq('id', 0); // Delete all rows
-        
+
       if (visitsError) {
         console.error('Error resetting visits:', visitsError);
-        toast({ title: 'Chyba při resetování návštěv', description: visitsError.message });
-        return;
+        // Don't return error for visits deletion - continue with local state reset
+        console.warn('Could not delete visits from database, but continuing with local state reset');
       }
 
       // Update local state - clear all user progress
