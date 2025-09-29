@@ -3,7 +3,7 @@
 
 -- Quiz questions table
 CREATE TABLE IF NOT EXISTS public.quiz_questions (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     question_text TEXT NOT NULL,
     question_type TEXT NOT NULL CHECK (question_type IN ('multiple_choice', 'true_false', 'text_input', 'video', 'audio')),
     category TEXT DEFAULT 'general',
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.quiz_questions (
 
 -- Quiz answers table
 CREATE TABLE IF NOT EXISTS public.quiz_answers (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     question_id BIGINT REFERENCES public.quiz_questions(id) ON DELETE CASCADE,
     answer_text TEXT NOT NULL,
     is_correct BOOLEAN DEFAULT false,
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS public.quiz_answers (
 
 -- Quiz media files table (for videos, audio, images)
 CREATE TABLE IF NOT EXISTS public.quiz_media (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     question_id BIGINT REFERENCES public.quiz_questions(id) ON DELETE CASCADE,
     file_name TEXT NOT NULL,
     file_url TEXT NOT NULL, -- Supabase storage URL
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.quiz_media (
 
 -- Quiz sessions/results table
 CREATE TABLE IF NOT EXISTS public.quiz_sessions (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     user_id BIGINT REFERENCES public.users(id) ON DELETE CASCADE,
     started_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     completed_at TIMESTAMP WITH TIME ZONE,
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS public.quiz_sessions (
 
 -- Quiz answers given by users
 CREATE TABLE IF NOT EXISTS public.quiz_user_answers (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     session_id BIGINT REFERENCES public.quiz_sessions(id) ON DELETE CASCADE,
     question_id BIGINT REFERENCES public.quiz_questions(id) ON DELETE CASCADE,
     answer_id BIGINT REFERENCES public.quiz_answers(id) ON DELETE SET NULL,
