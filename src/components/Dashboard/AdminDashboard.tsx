@@ -20,7 +20,6 @@ import { WinnersModal } from './WinnersModal';
 import { ImageUploadModal } from '@/components/Modals/ImageUploadModal';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { downloadQuizAsCSV, downloadQuizAsExcel, downloadQuizMedia, getQuizStats } from '@/lib/quizExport';
 
 export const AdminDashboard = () => {
   const { logout } = useAuth();
@@ -196,57 +195,6 @@ export const AdminDashboard = () => {
     });
   };
 
-  // Quiz export handlers
-  const handleExportQuizCSV = async () => {
-    try {
-      await downloadQuizAsCSV();
-      toast({
-        title: 'Export dokončen',
-        description: 'Kvíz byl exportován jako CSV soubor',
-      });
-    } catch (error) {
-      console.error('Quiz CSV export error:', error);
-      toast({
-        title: 'Chyba při exportu',
-        description: 'Nepodařilo se exportovat kvíz jako CSV',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const handleExportQuizExcel = async () => {
-    try {
-      await downloadQuizAsExcel();
-      toast({
-        title: 'Export dokončen',
-        description: 'Kvíz byl exportován jako Excel soubor (.xls)',
-      });
-    } catch (error) {
-      console.error('Quiz Excel export error:', error);
-      toast({
-        title: 'Chyba při exportu',
-        description: 'Nepodařilo se exportovat kvíz jako Excel',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const handleExportQuizMedia = async () => {
-    try {
-      await downloadQuizMedia();
-      toast({
-        title: 'Export dokončen',
-        description: 'Seznam mediálních souborů kvízu byl stažen',
-      });
-    } catch (error) {
-      console.error('Quiz media export error:', error);
-      toast({
-        title: 'Chyba při exportu',
-        description: 'Nepodařilo se exportovat mediální soubory',
-        variant: 'destructive'
-      });
-    }
-  };
 
   const handleDeleteUser = async (userId: number) => {
     try {
@@ -1818,43 +1766,6 @@ export const AdminDashboard = () => {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-blue-600" />
-                    Export kvízu
-                  </CardTitle>
-                  <CardDescription>
-                    Exportujte otázky, odpovědi a mediální soubory kvízu
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <Button
-                    onClick={handleExportQuizCSV}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Exportovat jako CSV
-                  </Button>
-                  <Button
-                    onClick={handleExportQuizExcel}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Exportovat jako Excel
-                  </Button>
-                  <Button
-                    onClick={handleExportQuizMedia}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportovat mediální soubory
-                  </Button>
-                </CardContent>
-              </Card>
 
               <Card>
                 <CardHeader>
