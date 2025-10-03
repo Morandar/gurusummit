@@ -708,7 +708,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         if (user.id !== userId) return user;
         const already = user.visitedBooths.includes(boothId);
         if (already) return user; // shouldn't happen, but safety check
-        
+
         const newVisitedBooths = [...user.visitedBooths, boothId];
         const newProgress = booths.length > 0 ? Math.round((newVisitedBooths.length / booths.length) * 100) : 0;
         return {
@@ -718,6 +718,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           progress: newProgress
         };
       }));
+
+      // Update progress in database to keep it in sync
+      const newVisitedBooths = [...targetUser.visitedBooths, boothId];
+      const newProgress = booths.length > 0 ? Math.round((newVisitedBooths.length / booths.length) * 100) : 0;
+      await supabase
+        .from('users')
+        .update({ progress: newProgress, visits: targetUser.visits + 1 })
+        .eq('id', userId);
 
       // Update booth visit count in local state  
       setBooths(prevBooths => prevBooths.map(booth => (

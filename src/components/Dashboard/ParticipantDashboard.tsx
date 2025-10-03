@@ -218,6 +218,39 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
           <ScrollingBanner banners={banners} />
         )}
 
+        {/* Current Event Progress Bar */}
+        {getCurrentEvent() && (
+          <div className="bg-gradient-to-r from-primary/10 to-secondary/10 border-y border-primary/20">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`p-2 rounded-full ${getCategoryInfo(getCurrentEvent()?.category || 'lecture').bgColor}`}>
+                      {(() => {
+                        const CategoryIcon = getCategoryInfo(getCurrentEvent()?.category || 'lecture').icon;
+                        return <CategoryIcon className={`h-4 w-4 ${getCategoryInfo(getCurrentEvent()?.category || 'lecture').color}`} />;
+                      })()}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm sm:text-base text-primary">
+                        Právě probíhá: {getCurrentEvent()?.event}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {getCurrentEvent()?.time} - {calculateEventEndTime(getCurrentEvent())} • Zbývá {formatTimeHours(timeRemaining)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-secondary animate-pulse">
+                    ŽIVĚ
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
           <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-6 sm:mb-8">
             {/* Program Status Card */}
