@@ -30,12 +30,12 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
   const visitedBooths = currentUser?.visitedBooths || [];
   const progress = booths.length > 0 ? (visitedBooths.length / booths.length) * 100 : 0;
 
-  // Get current program event (what's happening now)
-  const getCurrentEvent = () => {
+  // Get current program events (what's happening now) - can return multiple overlapping events
+  const getCurrentEvents = () => {
     const now = new Date();
     const currentTime = now.getHours() * 60 + now.getMinutes();
 
-    return program.find(event => {
+    return program.filter(event => {
       const [eventHour, eventMinute] = event.time.split(':').map(Number);
       const eventStartTime = eventHour * 60 + eventMinute;
       const eventEndTime = eventStartTime + event.duration;
@@ -55,11 +55,12 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
     });
   };
 
-  // Calculate time remaining for current event
+  // Calculate time remaining for current event (uses the first current event)
   const calculateTimeRemaining = () => {
-    const currentEvent = getCurrentEvent();
-    if (!currentEvent) return 0;
+    const currentEvents = getCurrentEvents();
+    if (currentEvents.length === 0) return 0;
 
+    const currentEvent = currentEvents[0]; // Use first event for time remaining
     const now = new Date();
     const currentTime = now.getHours() * 60 + now.getMinutes();
     const [eventHour, eventMinute] = currentEvent.time.split(':').map(Number);
@@ -218,33 +219,44 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
           <ScrollingBanner banners={banners} />
         )}
 
-        {/* Current Event Progress Bar */}
-        {getCurrentEvent() && (
+        {/* Current Events Progress Bar */}
+        {getCurrentEvents().length > 0 && (
           <div className="bg-gradient-to-r from-primary/10 to-secondary/10 border-y border-primary/20">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <div className={`p-2 rounded-full ${getCategoryInfo(getCurrentEvent()?.category || 'lecture').bgColor}`}>
-                      {(() => {
-                        const CategoryIcon = getCategoryInfo(getCurrentEvent()?.category || 'lecture').icon;
-                        return <CategoryIcon className={`h-4 w-4 ${getCategoryInfo(getCurrentEvent()?.category || 'lecture').color}`} />;
-                      })()}
-                    </div>
-                    <div>
-                      <div className="font-semibold text-sm sm:text-base text-primary">
-                        Právě probíhá: {getCurrentEvent()?.event}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {getCurrentEvent()?.time} - {calculateEventEndTime(getCurrentEvent())} • Zbývá {formatTimeHours(timeRemaining)}
-                      </div>
-                    </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge className="bg-secondary animate-pulse">
+                      ŽIVĚ
+                    </Badge>
+                    <span className="text-sm font-medium text-primary">
+                      Právě probíhá ({getCurrentEvents().length} {getCurrentEvents().length === 1 ? 'událost' : 'události'})
+                    </span>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-secondary animate-pulse">
-                    ŽIVĚ
-                  </Badge>
+                  <div className="space-y-2">
+                    {getCurrentEvents().map((event, index) => {
+                      const categoryInfo = getCategoryInfo(event.category || 'lecture');
+                      const CategoryIcon = categoryInfo.icon;
+                      const isFirstEvent = index === 0;
+
+                      return (
+                        <div key={event.id} className="flex items-center gap-3">
+                          <div className={`p-2 rounded-full ${categoryInfo.bgColor}`}>
+                            <CategoryIcon className={`h-4 w-4 ${categoryInfo.color}`} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-sm sm:text-base text-primary">
+                              {event.event}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {event.time} - {calculateEventEndTime(event)} • {event.duration} minut
+                              {isFirstEvent && ` • Zbývá ${formatTimeHours(timeRemaining)}`}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
