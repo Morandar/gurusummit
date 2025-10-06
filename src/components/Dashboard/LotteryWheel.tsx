@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Trophy, RotateCcw, Trash2, Play, User } from 'lucide-react';
+import { Trophy, RotateCcw, Trash2, Play, User, Maximize2, Minimize2 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 
 interface LotteryWheelProps {
@@ -12,10 +12,11 @@ interface LotteryWheelProps {
 }
 
 export const LotteryWheel = ({ isOpen, onClose }: LotteryWheelProps) => {
-  const { users, booths, winners, addWinner } = useData();
-  const [isSpinning, setIsSpinning] = useState(false);
-  const [winner, setWinner] = useState<{ id: number; firstName: string; lastName: string; personalNumber: string; profileImage?: string } | null>(null);
-  const [excludedUsers, setExcludedUsers] = useState<number[]>([]);
+   const { users, booths, winners, addWinner } = useData();
+   const [isSpinning, setIsSpinning] = useState(false);
+   const [winner, setWinner] = useState<{ id: number; firstName: string; lastName: string; personalNumber: string; profileImage?: string } | null>(null);
+   const [excludedUsers, setExcludedUsers] = useState<number[]>([]);
+   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Get users who completed all booths and are not already winners
   const winnerUserIds = winners.map(w => w.userId);
@@ -64,18 +65,33 @@ export const LotteryWheel = ({ isOpen, onClose }: LotteryWheelProps) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className={`fixed inset-0 flex items-center justify-center z-50 p-4 ${isFullscreen ? 'bg-black' : 'bg-black/50'}`}>
+      <Card className={`w-full ${isFullscreen ? 'max-w-none h-full max-h-none' : 'max-w-2xl max-h-[90vh]'} overflow-y-auto`}>
         <CardHeader className="text-center bg-gradient-primary text-white rounded-t-lg">
-          <CardTitle className="flex items-center justify-center gap-2 text-2xl">
-            <Trophy className="h-6 w-6" />
-            Kolo štěstí - O2 Guru Summit 2025
-          </CardTitle>
-          <p className="text-white/90">
-            Slosování o super ceny pro účastníky se 100% pokrokem
-          </p>
+          <div className="flex items-center justify-between">
+            <div className="flex-1"></div>
+            <div className="flex-1 text-center">
+              <CardTitle className="flex items-center justify-center gap-2 text-2xl">
+                <Trophy className="h-6 w-6" />
+                Kolo štěstí - O2 Guru Summit 2025
+              </CardTitle>
+              <p className="text-white/90">
+                Slosování o super ceny pro účastníky se 100% pokrokem
+              </p>
+            </div>
+            <div className="flex-1 flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="text-white hover:bg-white/20"
+              >
+                {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+              </Button>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="p-6 space-y-6">
+        <CardContent className={`${isFullscreen ? 'p-8' : 'p-6'} space-y-6`}>
           {/* Statistics */}
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center p-4 bg-primary/10 rounded-lg">
