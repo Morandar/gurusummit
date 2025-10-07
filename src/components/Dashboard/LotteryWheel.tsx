@@ -21,8 +21,7 @@ export const LotteryWheel = ({ isOpen, onClose }: LotteryWheelProps) => {
   // Get users who completed all booths and are not already winners
   const winnerUserIds = winners.map(w => w.userId);
   const eligibleUsers = users.filter(user => {
-    const progress = booths.length > 0 ? (user.visitedBooths.length / booths.length) * 100 : 0;
-    return progress === 100 && !winnerUserIds.includes(user.id);
+    return user.visitedBooths.length >= booths.length && !winnerUserIds.includes(user.id);
   });
 
   const spinWheel = () => {

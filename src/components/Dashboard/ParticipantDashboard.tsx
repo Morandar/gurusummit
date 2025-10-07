@@ -310,19 +310,19 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
           </Card>
 
           {/* Lottery Status Card */}
-          <Card className={progress === 100 ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200' : ''}>
+          <Card className={visitedBooths.length >= booths.length ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200' : ''}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                {progress === 100 ? 'Slosování o ceny' : 'Status slosování'}
+                {visitedBooths.length >= booths.length ? 'Slosování o ceny' : 'Status slosování'}
               </CardTitle>
-              {progress === 100 ? (
+              {visitedBooths.length >= booths.length ? (
                 <Award className="h-4 w-4 text-yellow-600" />
               ) : (
                 <Trophy className="h-4 w-4 text-muted-foreground" />
               )}
             </CardHeader>
             <CardContent>
-              {progress === 100 ? (
+              {visitedBooths.length >= booths.length ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Star className="h-5 w-5 text-yellow-500 fill-current" />
