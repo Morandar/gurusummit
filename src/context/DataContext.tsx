@@ -393,10 +393,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (visitCountsError) {
         console.warn('⚠️ DataContext: RPC not available, falling back to grouped query');
 
-        // Fallback: Group visits by attendee_id and count them (remove limit to get all)
+        // Fallback: Group visits by attendee_id and count them (set high limit to get all)
         const { data: visitsData, error: visitsError } = await supabase
           .from('visits')
-          .select('attendee_id');
+          .select('attendee_id')
+          .limit(10000); // Explicitly set high limit to override Supabase default of 1000
 
         if (!visitsError && visitsData) {
           visitsData.forEach((visit: any) => {
