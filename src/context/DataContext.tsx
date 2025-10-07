@@ -383,6 +383,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       }
 
       console.log(`👥 DataContext: Fetched ${usersData.length} users from database`);
+      console.log('👥 DataContext: Sample user data:', usersData[0]); // Debug first user
 
       // For performance, fetch visit counts aggregated by user instead of all individual visits
       const { data: visitCountsData, error: visitCountsError } = await supabase
@@ -404,6 +405,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             visitsByUser[visit.attendee_id] = (visitsByUser[visit.attendee_id] || 0) + 1;
           });
           console.log(`👥 DataContext: Processed ${visitsData.length} visits into counts`);
+          console.log('👥 DataContext: Sample visit counts:', Object.entries(visitsByUser).slice(0, 3)); // Debug first 3
         } else {
           console.warn('⚠️ DataContext: Could not fetch visit counts:', visitsError);
         }
@@ -464,6 +466,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       const endTime = Date.now();
       console.log(`👥 DataContext: Total optimized fetchUsers time: ${endTime - usersStartTime}ms`);
+      console.log('👥 DataContext: Final user stats:', {
+        totalUsers: mappedUsers.length,
+        totalVisits: mappedUsers.reduce((sum, u) => sum + u.visits, 0),
+        sampleUser: mappedUsers[0]
+      });
 
       setUsersState(mappedUsers);
     } catch (error) {
