@@ -868,21 +868,32 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.log('✅ DataContext: Visit inserted successfully, updating local state...');
 
       // Update local state - add to user's visited booths
-      setUsers(prevUsers => prevUsers.map(user => {
-        if (user.id !== userId) return user;
-        const already = user.visitedBooths.includes(boothId);
-        if (already) return user; // shouldn't happen, but safety check
+      setUsersState(prevUsers => {
+        console.log('🔄 DataContext: setUsersState called with prevUsers length:', prevUsers.length);
+        const updatedUsers = prevUsers.map(user => {
+          if (user.id !== userId) return user;
+          const already = user.visitedBooths.includes(boothId);
+          if (already) {
+            console.log('⚠️ DataContext: User already visited this booth');
+            return user;
+          }
 
-        const newVisitedBooths = [...user.visitedBooths, boothId];
-        const newProgress = booths.length > 0 ? Math.round((newVisitedBooths.length / booths.length) * 100) : 0;
-        console.log(`📊 DataContext: Updated user progress: ${newProgress}% (${newVisitedBooths.length}/${booths.length})`);
-        return {
-          ...user,
-          visitedBooths: newVisitedBooths,
-          visits: user.visits + 1,
-          progress: newProgress
-        };
-      }));
+          const newVisitedBooths = [...user.visitedBooths, boothId];
+          const newProgress = booths.length > 0 ? Math.round((newVisitedBooths.length / booths.length) * 100) : 0;
+          console.log(`📊 DataContext: Updated user progress: ${newProgress}% (${newVisitedBooths.length}/${booths.length})`);
+
+          const updatedUser = {
+            ...user,
+            visitedBooths: newVisitedBooths,
+            visits: user.visits + 1,
+            progress: newProgress
+          };
+          console.log('👤 DataContext: Updated user:', updatedUser);
+          return updatedUser;
+        });
+        console.log('🔄 DataContext: Returning updated users array with length:', updatedUsers.length);
+        return updatedUsers;
+      });
 
       // Update progress in database to keep it in sync
       const newVisitedBooths = [...targetUser.visitedBooths, boothId];
@@ -894,9 +905,15 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         .eq('id', userId);
 
       // Update booth visit count in local state
-      setBooths(prevBooths => prevBooths.map(booth => (
-        booth.id === boothId ? { ...booth, visits: booth.visits + 1 } : booth
-      )));
+      setBooths(prevBooths => {
+        console.log('🏪 DataContext: Updating booth visit count for booth', boothId);
+        const updatedBooths = prevBooths.map(booth => (
+          booth.id === boothId ? { ...booth, visits: booth.visits + 1 } : booth
+        ));
+        const updatedBooth = updatedBooths.find(b => b.id === boothId);
+        console.log('🏪 DataContext: Booth visit count updated to:', updatedBooth?.visits);
+        return updatedBooths;
+      });
 
       console.log('✅ DataContext: Booth visit completed successfully');
       toast({ title: 'Stánek navštíven!', description: 'Váš pokrok byl aktualizován.' });
