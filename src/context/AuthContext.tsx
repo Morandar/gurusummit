@@ -46,6 +46,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const setUserWithLogging = (newUser: User | null) => {
+    console.log('AuthContext: setUser called with:', newUser);
+    setUser(newUser);
+  };
+
 
   // Po načtení stránky načti session ze Supabase a nastav uživatele, pokud je session platná
   useEffect(() => {
@@ -77,14 +82,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session && session.user) {
         // Rozlišení typu uživatele podle emailu (admin) nebo jiných údajů
         if (session.user.email === 'admin@o2.cz') {
-          setUser({
+          setUserWithLogging({
             id: 'admin',
             personalNumber: session.user.email,
             type: 'admin',
           });
         } else {
           // Pokud byste chtěli podporovat i další typy uživatelů, zde je místo pro rozšíření
-          setUser({
+          setUserWithLogging({
             id: session.user.id,
             personalNumber: session.user.email || '',
             type: 'participant',
@@ -96,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           logout();
         }, 60 * 60 * 1000);
       } else {
-        setUser(null);
+        setUserWithLogging(null);
       }
       setIsLoading(false);
     };
@@ -125,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password: pwd,
         });
         if (error || !data.session) return false;
-        setUser({ id: 'admin', personalNumber: username, type: 'admin' });
+        setUserWithLogging({ id: 'admin', personalNumber: username, type: 'admin' });
         return true;
       }
 
@@ -151,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           boothId: Number(booth.id),
         };
 
-        setUser(boothUser);
+        setUserWithLogging(boothUser);
         // Store booth user in localStorage and window for persistence
         localStorage.setItem('authUser', JSON.stringify(boothUser));
         (window as any).__authUser = boothUser;
@@ -184,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             type: 'participant',
             position: (foundUser as any).position,
           };
-          setUser(participantUser);
+          setUserWithLogging(participantUser);
           // Store participant user in localStorage and window
           localStorage.setItem('authUser', JSON.stringify(participantUser));
           (window as any).__authUser = participantUser;
@@ -215,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             type: 'participant',
             position: inserted?.position || position,
           };
-          setUser(participantUser);
+          setUserWithLogging(participantUser);
           // Store participant user in localStorage and window
           localStorage.setItem('authUser', JSON.stringify(participantUser));
           (window as any).__authUser = participantUser;
@@ -233,7 +238,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    setUser(null);
+    console.log('AuthContext: logout called');
+    setUserWithLogging(null);
     // Clear localStorage for participant users
     localStorage.removeItem('authUser');
     await supabase.auth.signOut();
@@ -245,7 +251,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
         if (parsedUser && (parsedUser.type === 'participant' || parsedUser.type === 'booth')) {
-          setUser(parsedUser);
+          console.log('AuthContext: Setting user from storage:', parsedUser);
+          setUserWithLogging(parsedUser);
           (window as any).__authUser = parsedUser;
         }
       }

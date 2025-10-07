@@ -152,7 +152,14 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="position">Pozice *</Label>
-                      <Select value={position} onValueChange={setPosition} required>
+                      <Select
+                        value={position}
+                        onValueChange={(value) => {
+                          console.log('Position selected:', value);
+                          setPosition(value);
+                        }}
+                        required
+                      >
                         <SelectTrigger id="position">
                           <SelectValue placeholder="Vyberte pozici" />
                         </SelectTrigger>
