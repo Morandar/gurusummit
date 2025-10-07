@@ -371,12 +371,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     const usersStartTime = Date.now();
 
     try {
-      // Fetch users first (limit to reasonable number)
+      // Fetch all users (remove limit to get complete stats)
       const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('*')
-        .order('id')
-        .limit(500); // Reduced limit to prevent overload
+        .order('id');
 
       if (usersError || !usersData) {
         console.error('❌ DataContext: Error fetching users:', usersError);
@@ -394,11 +393,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (visitCountsError) {
         console.warn('⚠️ DataContext: RPC not available, falling back to grouped query');
 
-        // Fallback: Group visits by attendee_id and count them
+        // Fallback: Group visits by attendee_id and count them (remove limit to get all)
         const { data: visitsData, error: visitsError } = await supabase
           .from('visits')
-          .select('attendee_id')
-          .limit(5000); // Limit to prevent excessive data
+          .select('attendee_id');
 
         if (!visitsError && visitsData) {
           visitsData.forEach((visit: any) => {
@@ -431,8 +429,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         const { data: detailedVisitsData, error: detailedError } = await supabase
           .from('visits')
           .select('attendee_id, booth_id')
-          .in('attendee_id', userIds)
-          .limit(2000);
+          .in('attendee_id', userIds);
 
         if (!detailedError && detailedVisitsData) {
           detailedVisitsData.forEach((visit: any) => {
@@ -454,7 +451,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           id: user.id,
           personalNumber: user.personalnumber,
           firstName: user.firstname,
-          lastName: user.lastname,
+          lastName: user.lastName,
           position: user.position,
           visits: visitCount,
           progress: boothCount > 0 ? Math.round((visitCount / boothCount) * 100) : 0,
