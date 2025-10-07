@@ -425,66 +425,29 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.log(`👥 DataContext: Fetched ${usersData.length} users from database`);
       console.log('👥 DataContext: Sample user data:', usersData[0]); // Debug first user
 
-      // For performance, fetch visit counts aggregated by user instead of all individual visits
-      const { data: visitCountsData, error: visitCountsError } = await supabase
-        .rpc('get_user_visit_counts'); // Try to use a stored procedure if available
+      const { data: visitsData, error: visitsError } = await fetchAllVisitRows('attendee_id, booth_id');
 
-      let visitsByUser: { [userId: number]: number } = {};
+      const visitsByUser: Map<number, Set<number>> = new Map();
 
-      if (visitCountsError) {
-        console.warn('⚠️ DataContext: RPC not available, falling back to grouped query');
-
-        const { data: visitsData, error: visitsError } = await fetchAllVisitRows('attendee_id');
-
-        if (!visitsError && visitsData.length > 0) {
-          visitsData.forEach((visit: any) => {
-            visitsByUser[visit.attendee_id] = (visitsByUser[visit.attendee_id] || 0) + 1;
-          });
-          console.log(`👥 DataContext: Processed ${visitsData.length} visits into counts`);
-          console.log('👥 DataContext: Sample visit counts:', Object.entries(visitsByUser).slice(0, 3)); // Debug first 3
-        } else if (visitsError) {
-          console.warn('⚠️ DataContext: Could not fetch visit counts:', visitsError);
-        }
-      } else {
-        // Use the RPC result
-        visitCountsData?.forEach((count: any) => {
-          visitsByUser[count.user_id] = count.visit_count;
+      if (!visitsError && visitsData.length > 0) {
+        visitsData.forEach((visit: any) => {
+          if (visit.attendee_id == null || visit.booth_id == null) return;
+          if (!visitsByUser.has(visit.attendee_id)) {
+            visitsByUser.set(visit.attendee_id, new Set<number>());
+          }
+          visitsByUser.get(visit.attendee_id)!.add(visit.booth_id);
         });
-        console.log('👥 DataContext: Used RPC for visit counts');
-      }
-
-      // For detailed booth lists, fetch only for users with reasonable visit counts
-      const usersNeedingDetails = usersData.filter((user: any) =>
-        (visitsByUser[user.id] || 0) > 0 && (visitsByUser[user.id] || 0) < 50
-      );
-
-      const detailedVisits: { [userId: number]: number[] } = {};
-
-      if (usersNeedingDetails.length > 0) {
-        console.log(`👥 DataContext: Fetching detailed visits for ${usersNeedingDetails.length} users`);
-
-        // Fetch detailed visits only for users who need them
-        const userIds = usersNeedingDetails.map((u: any) => u.id);
-        const { data: detailedVisitsData, error: detailedError } = await supabase
-          .from('visits')
-          .select('attendee_id, booth_id')
-          .in('attendee_id', userIds);
-
-        if (!detailedError && detailedVisitsData) {
-          detailedVisitsData.forEach((visit: any) => {
-            if (!detailedVisits[visit.attendee_id]) {
-              detailedVisits[visit.attendee_id] = [];
-            }
-            detailedVisits[visit.attendee_id].push(visit.booth_id);
-          });
-        }
+        console.log(`👥 DataContext: Processed ${visitsData.length} visit rows into unique booth counts`);
+      } else if (visitsError) {
+        console.warn('⚠️ DataContext: Could not fetch visit details:', visitsError);
       }
 
       const boothCount = totalBooths || booths.length;
 
       const mappedUsers = usersData.map((user: any) => {
-        const visitCount = visitsByUser[user.id] || 0;
-        const visitedBooths = detailedVisits[user.id] || [];
+        const userBooths = visitsByUser.get(user.id) || new Set<number>();
+        const visitedBooths = Array.from(userBooths);
+        const visitCount = visitedBooths.length;
 
         return {
           id: user.id,
@@ -494,7 +457,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           position: user.position,
           visits: visitCount,
           progress: calculateProgress(visitCount, boothCount),
-          visitedBooths: visitedBooths, // Only detailed for users with reasonable counts
+          visitedBooths: visitedBooths, // Unique booth IDs visited by the user
           profileImage: user.profileimage,
           password_hash: user.password_hash
         };
@@ -532,16 +495,24 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       console.log(`🏪 DataContext: Fetched ${boothsData?.length || 0} booths from database`);
 
-      // Get visit counts for all booths (no limit to get all)
-      const visitCounts: { [boothId: number]: number } = {};
-      const { data: visitsData, error: visitsError } = await fetchAllVisitRows('booth_id');
+      const boothVisitorSets: Map<number, Set<number>> = new Map();
+      const { data: visitsData, error: visitsError } = await fetchAllVisitRows('booth_id, attendee_id');
       if (!visitsError && visitsData.length > 0) {
         visitsData.forEach((visit: any) => {
-          visitCounts[visit.booth_id] = (visitCounts[visit.booth_id] || 0) + 1;
+          if (visit.booth_id == null || visit.attendee_id == null) return;
+          if (!boothVisitorSets.has(visit.booth_id)) {
+            boothVisitorSets.set(visit.booth_id, new Set<number>());
+          }
+          boothVisitorSets.get(visit.booth_id)!.add(visit.attendee_id);
         });
       } else if (visitsError) {
         console.warn('⚠️ DataContext: Could not fetch visits for booths:', visitsError);
       }
+
+      const visitCounts: { [boothId: number]: number } = {};
+      boothVisitorSets.forEach((visitors, boothId) => {
+        visitCounts[boothId] = visitors.size;
+      });
 
       console.log(`🏪 DataContext: Processed visit counts for ${Object.keys(visitCounts).length} booths`);
 
