@@ -12,16 +12,17 @@ interface LotteryWheelProps {
 }
 
 export const LotteryWheel = ({ isOpen, onClose }: LotteryWheelProps) => {
-   const { users, booths, winners, addWinner } = useData();
+    const { users, booths, winners, addWinner, lotterySettings } = useData();
    const [isSpinning, setIsSpinning] = useState(false);
    const [winner, setWinner] = useState<{ id: number; firstName: string; lastName: string; personalNumber: string; profileImage?: string } | null>(null);
    const [excludedUsers, setExcludedUsers] = useState<number[]>([]);
    const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Get users who completed all booths and are not already winners
+  // Get users who completed minimum percentage and are not already winners
   const winnerUserIds = winners.map(w => w.userId);
   const eligibleUsers = users.filter(user => {
-    return user.visitedBooths.length >= booths.length && !winnerUserIds.includes(user.id);
+    const requiredBooths = Math.ceil((lotterySettings.minimumPercentage / 100) * booths.length);
+    return user.visitedBooths.length >= requiredBooths && !winnerUserIds.includes(user.id);
   });
 
   const spinWheel = () => {
@@ -75,7 +76,7 @@ export const LotteryWheel = ({ isOpen, onClose }: LotteryWheelProps) => {
                 Kolo štěstí - O2 Guru Summit 2025
               </CardTitle>
               <p className="text-white/90">
-                Slosování o super ceny pro účastníky se 100% pokrokem
+                Slosování o super ceny pro účastníky s minimálně {lotterySettings.minimumPercentage}% pokrokem
               </p>
             </div>
             <div className="flex-1 flex justify-end">

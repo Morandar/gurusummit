@@ -20,7 +20,7 @@ interface ParticipantDashboardProps {
 }
 
 export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: ParticipantDashboardProps) => {
-  const { booths, program, users, visitBooth, isLoading, discountedPhones, banners, banner } = useData();
+  const { booths, program, users, visitBooth, isLoading, discountedPhones, banners, banner, lotterySettings } = useData();
   const [timeToNext, setTimeToNext] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [selectedBooth, setSelectedBooth] = useState<{ id: number; name: string } | null>(null);
@@ -310,26 +310,26 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
           </Card>
 
           {/* Lottery Status Card */}
-          <Card className={visitedBooths.length >= booths.length ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200' : ''}>
+          <Card className={progress >= lotterySettings.minimumPercentage ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200' : ''}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                {visitedBooths.length >= booths.length ? 'Slosování o ceny' : 'Status slosování'}
+                {progress >= lotterySettings.minimumPercentage ? 'Slosování o ceny' : 'Status slosování'}
               </CardTitle>
-              {visitedBooths.length >= booths.length ? (
+              {progress >= lotterySettings.minimumPercentage ? (
                 <Award className="h-4 w-4 text-yellow-600" />
               ) : (
                 <Trophy className="h-4 w-4 text-muted-foreground" />
               )}
             </CardHeader>
             <CardContent>
-              {visitedBooths.length >= booths.length ? (
+              {progress >= lotterySettings.minimumPercentage ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Star className="h-5 w-5 text-yellow-500 fill-current" />
                     <span className="text-lg font-bold text-yellow-700">Jsem ve slosování!</span>
                   </div>
                   <p className="text-xs text-yellow-600 font-medium">
-                    Gratulujeme! Dokončil jsi všechny stánky.
+                    Gratulujeme! Dosáhl jsi minimálního pokroku {lotterySettings.minimumPercentage}%.
                   </p>
                 </div>
               ) : (
@@ -338,7 +338,7 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                     Nejsem ve slosování
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Dokonči všechny stánky pro účast v losování
+                    Dokonči alespoň {lotterySettings.minimumPercentage}% stánků pro účast v losování
                   </p>
                 </div>
               )}

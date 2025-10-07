@@ -24,8 +24,8 @@ import { Textarea } from '@/components/ui/textarea';
 export const AdminDashboard = () => {
   const { logout } = useAuth();
   const {
-    users, booths, program, codeTimeSettings, homePageTexts, winners, discountedPhones, banners, banner,
-    setUsers, setBooths, setProgram, setCodeTimeSettings, setHomePageTexts, setDiscountedPhones, setBanner,
+    users, booths, program, codeTimeSettings, homePageTexts, lotterySettings, winners, discountedPhones, banners, banner,
+    setUsers, setBooths, setProgram, setCodeTimeSettings, setHomePageTexts, setLotterySettings, setDiscountedPhones, setBanner,
     resetAllProgress, removeUserProfileImage, addUserByAdmin, updateBanner, fetchAllBanners
   } = useData();
 
@@ -1535,6 +1535,33 @@ export const AdminDashboard = () => {
           <TabsContent value="settings" className="space-y-6">
             <Card>
               <CardHeader>
+                <CardTitle>Nastavení slosování</CardTitle>
+                <CardDescription>
+                  Nastavte minimální procento stánků potřebné pro účast v losování o ceny
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="minimum-percentage">Minimální pokrok (%)</Label>
+                  <Input
+                    id="minimum-percentage"
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={lotterySettings.minimumPercentage}
+                    onChange={(e) =>
+                      setLotterySettings(prev => ({ ...prev, minimumPercentage: parseInt(e.target.value) || 100 }))
+                    }
+                  />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Účastníci musí navštívit alespoň {lotterySettings.minimumPercentage}% stánků pro účast v losování
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>Časové omezení kódů</CardTitle>
                 <CardDescription>
                   Nastavte časové okno pro zadávání kódů stánků
@@ -1544,13 +1571,13 @@ export const AdminDashboard = () => {
                 <div className="flex items-center space-x-2">
                   <Switch
                     checked={codeTimeSettings.enabled}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setCodeTimeSettings(prev => ({ ...prev, enabled: checked }))
                     }
                   />
                   <Label>Povolit časové omezení</Label>
                 </div>
-                
+
                 {codeTimeSettings.enabled && (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -1559,7 +1586,7 @@ export const AdminDashboard = () => {
                         id="startTime"
                         type="time"
                         value={codeTimeSettings.startTime}
-                        onChange={(e) => 
+                        onChange={(e) =>
                           setCodeTimeSettings(prev => ({ ...prev, startTime: e.target.value }))
                         }
                       />
@@ -1570,7 +1597,7 @@ export const AdminDashboard = () => {
                         id="endTime"
                         type="time"
                         value={codeTimeSettings.endTime}
-                        onChange={(e) => 
+                        onChange={(e) =>
                           setCodeTimeSettings(prev => ({ ...prev, endTime: e.target.value }))
                         }
                       />

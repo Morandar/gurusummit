@@ -64,6 +64,10 @@ interface HomePageTexts {
   prizesDescription: string;
 }
 
+interface LotterySettings {
+  minimumPercentage: number; // Minimum percentage of booths to visit for lottery eligibility
+}
+
 interface DiscountedPhone {
   id: number;
   manufacturerName: string;
@@ -101,6 +105,7 @@ interface DataContextType {
   program: ProgramEvent[];
   codeTimeSettings: CodeTimeSettings;
   homePageTexts: HomePageTexts;
+  lotterySettings: LotterySettings;
   winners: Winner[];
   discountedPhones: DiscountedPhone[];
   notifications: Notification[];
@@ -112,6 +117,7 @@ interface DataContextType {
   setProgram: React.Dispatch<React.SetStateAction<ProgramEvent[]>>;
   setCodeTimeSettings: React.Dispatch<React.SetStateAction<CodeTimeSettings>>;
   setHomePageTexts: React.Dispatch<React.SetStateAction<HomePageTexts>>;
+  setLotterySettings: React.Dispatch<React.SetStateAction<LotterySettings>>;
   setWinners: React.Dispatch<React.SetStateAction<Winner[]>>;
   setDiscountedPhones: React.Dispatch<React.SetStateAction<DiscountedPhone[]>>;
   setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
@@ -172,6 +178,10 @@ const initialHomePageTexts: HomePageTexts = {
   prizesDescription: 'Navštivte všechny stánky a získejte šanci vyhrát nejnovější technologie a exkluzivní O2 produkty.'
 };
 
+const initialLotterySettings: LotterySettings = {
+  minimumPercentage: 100 // Default to 100% (all booths required)
+};
+
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   
@@ -230,6 +240,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
   const [codeTimeSettings, setCodeTimeSettingsState] = useState<CodeTimeSettings>(initialCodeTimeSettings);
   const [homePageTexts, setHomePageTextsState] = useState<HomePageTexts>(initialHomePageTexts);
+  const [lotterySettings, setLotterySettingsState] = useState<LotterySettings>(initialLotterySettings);
   const [winners, setWinnersState] = useState<Winner[]>([]);
   const [discountedPhones, setDiscountedPhones] = useState<DiscountedPhone[]>(initialDiscountedPhones);
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
@@ -333,6 +344,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setHomePageTextsState(prev => {
       const next = typeof updater === 'function' ? (updater as any)(prev) : updater;
       supabase.from('settings').upsert([{ key: 'homePageTexts', value: JSON.stringify(next) }]).then();
+      return next;
+    });
+  };
+
+  const setLotterySettings = async (updater: React.SetStateAction<LotterySettings>) => {
+    setLotterySettingsState(prev => {
+      const next = typeof updater === 'function' ? (updater as any)(prev) : updater;
+      supabase.from('settings').upsert([{ key: 'lotterySettings', value: JSON.stringify(next) }]).then();
       return next;
     });
   };
@@ -708,7 +727,18 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (!homePageError && homePageData?.value) {
         const parsedHomePage = JSON.parse(homePageData.value);
         setHomePageTextsState(parsedHomePage);
-      } else {
+      }
+
+      // Fetch lottery settings
+      const { data: lotteryData, error: lotteryError } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'lotterySettings')
+        .single();
+
+      if (!lotteryError && lotteryData?.value) {
+        const parsedLottery = JSON.parse(lotteryData.value);
+        setLotterySettingsState(parsedLottery);
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -1236,6 +1266,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       program,
       codeTimeSettings,
       homePageTexts,
+      lotterySettings,
       winners,
       discountedPhones,
       notifications,
@@ -1247,6 +1278,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       setProgram,
       setCodeTimeSettings,
       setHomePageTexts,
+      setLotterySettings,
       setWinners,
       setDiscountedPhones,
       setNotifications,
