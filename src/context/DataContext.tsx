@@ -394,11 +394,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (visitCountsError) {
         console.warn('⚠️ DataContext: RPC not available, falling back to grouped query');
 
-        // Fallback: Group visits by attendee_id and count them (set high limit to get all)
+        // Fallback: Group visits by attendee_id and count them (no limit to get all)
         const { data: visitsData, error: visitsError } = await supabase
           .from('visits')
-          .select('attendee_id')
-          .limit(10000); // Explicitly set high limit to override Supabase default of 1000
+          .select('attendee_id'); // Remove all limits to get ALL records
 
         if (!visitsError && visitsData) {
           visitsData.forEach((visit: any) => {
@@ -496,10 +495,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       console.log(`🏪 DataContext: Fetched ${boothsData?.length || 0} booths from database`);
 
-      // Get visit counts for all booths
+      // Get visit counts for all booths (no limit to get all)
       const { data: visitsData, error: visitsError } = await supabase
         .from('visits')
-        .select('booth_id');
+        .select('booth_id'); // Remove limit to get ALL booth visits
 
       const visitCounts: { [boothId: number]: number } = {};
       if (!visitsError && visitsData) {
