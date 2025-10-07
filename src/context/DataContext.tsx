@@ -348,105 +348,147 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   // --- Supabase fetchers ---
   const fetchUsers = async (totalBooths?: number) => {
-    console.log('👥 DataContext: Starting optimized fetchUsers...');
+    console.log('👥 DataContext: Starting simplified fetchUsers (no visits for speed)...');
     const usersStartTime = Date.now();
 
-    // Fetch all users
-    const { data: usersData, error: usersError } = await supabase.from('users').select('*').order('id');
-    if (usersError || !usersData) {
-      console.error('❌ DataContext: Error fetching users:', usersError);
-      return;
-    }
+    try {
+      // First, just fetch users without visits to avoid timeout
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('*')
+        .order('id')
+        .limit(1000); // Limit to prevent excessive data
 
-    console.log(`👥 DataContext: Fetched ${usersData.length} users from database`);
+      if (usersError) {
+        console.error('❌ DataContext: Error fetching users:', usersError);
+        return;
+      }
 
-    // Fetch all visits in a single query
-    const { data: visitsData, error: visitsError } = await supabase
-      .from('visits')
-      .select('attendee_id, booth_id');
+      console.log(`👥 DataContext: Fetched ${usersData?.length || 0} users from database`);
 
-    if (visitsError) {
-      console.warn('⚠️ DataContext: Could not fetch visits, proceeding without visit data:', visitsError);
-    }
+      const boothCount = totalBooths || booths.length;
 
-    console.log(`👥 DataContext: Fetched ${visitsData?.length || 0} visits from database`);
-
-    // Group visits by user ID for efficient lookup
-    const visitsByUser: { [userId: number]: number[] } = {};
-    if (visitsData) {
-      visitsData.forEach((visit: any) => {
-        if (!visitsByUser[visit.attendee_id]) {
-          visitsByUser[visit.attendee_id] = [];
-        }
-        visitsByUser[visit.attendee_id].push(visit.booth_id);
-      });
-    }
-
-    const boothCount = totalBooths || booths.length;
-
-    const mappedUsers = usersData.map((user: any) => {
-      const visitedBooths = visitsByUser[user.id] || [];
-
-      return {
+      // Map users without visit data initially (for speed)
+      const mappedUsers = (usersData || []).map((user: any) => ({
         id: user.id,
         personalNumber: user.personalnumber,
         firstName: user.firstname,
         lastName: user.lastname,
         position: user.position,
-        // Calculate from actual visits table
-        visits: visitedBooths.length,
-        progress: boothCount > 0 ? Math.round((visitedBooths.length / boothCount) * 100) : 0,
-        visitedBooths: visitedBooths,
+        visits: 0, // Will be updated later if needed
+        progress: 0,
+        visitedBooths: [],
         profileImage: user.profileimage,
         password_hash: user.password_hash
-      };
-    });
+      }));
 
-    const endTime = Date.now();
-    console.log(`👥 DataContext: Total optimized fetchUsers time: ${endTime - usersStartTime}ms`);
+      const endTime = Date.now();
+      console.log(`👥 DataContext: Total simplified fetchUsers time: ${endTime - usersStartTime}ms`);
 
-    setUsersState(mappedUsers);
+      setUsersState(mappedUsers);
+
+      // Optionally load visit data in background (non-blocking)
+      // This prevents the loading screen from hanging
+      setTimeout(async () => {
+        try {
+          console.log('👥 DataContext: Loading visit data in background...');
+          const { data: visitsData, error: visitsError } = await supabase
+            .from('visits')
+            .select('attendee_id, booth_id')
+            .limit(5000); // Reasonable limit
+
+          if (!visitsError && visitsData) {
+            const visitsByUser: { [userId: number]: number[] } = {};
+            visitsData.forEach((visit: any) => {
+              if (!visitsByUser[visit.attendee_id]) {
+                visitsByUser[visit.attendee_id] = [];
+              }
+              visitsByUser[visit.attendee_id].push(visit.booth_id);
+            });
+
+            setUsersState(prevUsers =>
+              prevUsers.map(user => {
+                const visitedBooths = visitsByUser[user.id] || [];
+                return {
+                  ...user,
+                  visits: visitedBooths.length,
+                  progress: boothCount > 0 ? Math.round((visitedBooths.length / boothCount) * 100) : 0,
+                  visitedBooths: visitedBooths
+                };
+              })
+            );
+            console.log('👥 DataContext: Visit data loaded successfully in background');
+          }
+        } catch (error) {
+          console.warn('⚠️ DataContext: Could not load visit data in background:', error);
+        }
+      }, 1000); // Delay to prioritize initial load
+
+    } catch (error) {
+      console.error('❌ DataContext: Unexpected error in fetchUsers:', error);
+    }
   };
 
   const fetchBooths = async () => {
-    console.log('🏪 DataContext: Starting optimized fetchBooths...');
+    console.log('🏪 DataContext: Starting simplified fetchBooths...');
     const startTime = Date.now();
 
-    // Fetch all booths
-    const { data: boothsData, error: boothsError } = await supabase.from('booths').select('*').order('id');
-    if (boothsError || !boothsData) {
-      console.error('❌ DataContext: Error fetching booths:', boothsError);
-      return;
+    try {
+      // Fetch booths first (without visit counts for speed)
+      const { data: boothsData, error: boothsError } = await supabase
+        .from('booths')
+        .select('*')
+        .order('id');
+
+      if (boothsError) {
+        console.error('❌ DataContext: Error fetching booths:', boothsError);
+        return;
+      }
+
+      console.log(`🏪 DataContext: Fetched ${boothsData?.length || 0} booths from database`);
+
+      // Set booths without visit counts initially
+      const boothsWithoutVisits = (boothsData || []).map((booth: any) => ({
+        ...booth,
+        visits: 0 // Will be updated later
+      }));
+
+      setBooths(boothsWithoutVisits as any);
+
+      const endTime = Date.now();
+      console.log(`🏪 DataContext: Total simplified fetchBooths time: ${endTime - startTime}ms`);
+
+      // Load visit counts in background (non-blocking)
+      setTimeout(async () => {
+        try {
+          console.log('🏪 DataContext: Loading booth visit counts in background...');
+          const { data: visitsData, error: visitsError } = await supabase
+            .from('visits')
+            .select('booth_id')
+            .limit(5000);
+
+          if (!visitsError && visitsData) {
+            const visitCounts: { [boothId: number]: number } = {};
+            visitsData.forEach((visit: any) => {
+              visitCounts[visit.booth_id] = (visitCounts[visit.booth_id] || 0) + 1;
+            });
+
+            setBooths(prevBooths =>
+              prevBooths.map(booth => ({
+                ...booth,
+                visits: visitCounts[booth.id] || 0
+              }))
+            );
+            console.log('🏪 DataContext: Booth visit counts loaded successfully in background');
+          }
+        } catch (error) {
+          console.warn('⚠️ DataContext: Could not load booth visit counts in background:', error);
+        }
+      }, 500); // Shorter delay
+
+    } catch (error) {
+      console.error('❌ DataContext: Unexpected error in fetchBooths:', error);
     }
-
-    console.log(`🏪 DataContext: Fetched ${boothsData.length} booths from database`);
-
-    // Fetch all visits and count them
-    const { data: visitsData, error: visitsError } = await supabase
-      .from('visits')
-      .select('booth_id');
-
-    // Group visits by booth_id to count them
-    const visitCounts: { [boothId: number]: number } = {};
-    if (!visitsError && visitsData) {
-      visitsData.forEach((visit: any) => {
-        visitCounts[visit.booth_id] = (visitCounts[visit.booth_id] || 0) + 1;
-      });
-    } else if (visitsError) {
-      console.warn('⚠️ DataContext: Could not fetch visits, proceeding with 0 counts:', visitsError);
-    }
-
-    console.log(`🏪 DataContext: Processed visit counts for ${Object.keys(visitCounts).length} booths`);
-
-    const boothsWithVisits = boothsData.map((booth: any) => ({
-      ...booth,
-      visits: visitCounts[booth.id] || 0
-    }));
-
-    const endTime = Date.now();
-    console.log(`🏪 DataContext: Total optimized fetchBooths time: ${endTime - startTime}ms`);
-
-    setBooths(boothsWithVisits as any);
   };
 
   const fetchProgram = async () => {
