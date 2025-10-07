@@ -191,6 +191,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [program, setProgramState] = useState<ProgramEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const calculateProgress = (visitedCount: number, totalBooths: number) => {
+    if (totalBooths <= 0) return 0;
+    return Math.min(100, Math.round((visitedCount / totalBooths) * 100));
+  };
+
   const fetchAllVisitRows = async (columns: string, filter?: (query: any) => any) => {
     const pageSize = 1000;
     const maxPages = 100;
@@ -488,7 +493,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           lastName: user.lastname,
           position: user.position,
           visits: visitCount,
-          progress: boothCount > 0 ? Math.round((visitCount / boothCount) * 100) : 0,
+          progress: calculateProgress(visitCount, boothCount),
           visitedBooths: visitedBooths, // Only detailed for users with reasonable counts
           profileImage: user.profileimage,
           password_hash: user.password_hash
@@ -907,7 +912,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           }
 
           const newVisitedBooths = [...user.visitedBooths, boothId];
-          const newProgress = booths.length > 0 ? Math.round((newVisitedBooths.length / booths.length) * 100) : 0;
+          const newProgress = calculateProgress(newVisitedBooths.length, booths.length);
           console.log(`📊 DataContext: Updated user progress: ${newProgress}% (${newVisitedBooths.length}/${booths.length})`);
 
           const updatedUser = {
@@ -925,7 +930,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       // Update progress in database to keep it in sync
       const newVisitedBooths = [...targetUser.visitedBooths, boothId];
-      const newProgress = booths.length > 0 ? Math.round((newVisitedBooths.length / booths.length) * 100) : 0;
+      const newProgress = calculateProgress(newVisitedBooths.length, booths.length);
       console.log('💾 DataContext: Updating user progress in database...');
       await supabase
         .from('users')
@@ -1103,7 +1108,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     setUsers(prev => prev.map(u => {
-      const prog = booths.length > 0 ? Math.round((u.visitedBooths.length / booths.length) * 100) : 0;
+      const prog = calculateProgress(u.visitedBooths.length, booths.length);
       return { ...u, progress: prog };
     }));
   }, [booths.length]);
