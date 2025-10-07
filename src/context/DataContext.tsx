@@ -571,8 +571,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         });
 
         // Check for network-related errors
-        if (error.message?.includes('fetch')) {
-          console.error('🌐 DataContext: Network error detected - possible connectivity issue after network change');
+        if (error.message?.includes('Failed to fetch') || error.message?.includes('TypeError')) {
+          console.error('🌐 DataContext: Network connectivity error - check internet connection or Supabase status');
+          // Don't retry immediately for network errors
+          return;
         } else if (error.message?.includes('timeout')) {
           console.error('⏰ DataContext: Timeout error - network may be slow or unreachable');
         } else {
@@ -761,12 +763,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     };
     fetchData();
 
-    // Set up periodic banner check every 30 seconds
+    // Set up periodic banner check every 5 minutes (reduced frequency to avoid rate limits)
     let pollCount = 0;
     const bannerInterval = setInterval(() => {
       pollCount++;
+      console.log(`📡 DataContext: Banner poll #${pollCount}`);
       fetchBanner();
-    }, 30000); // Check every 30 seconds
+    }, 300000); // Check every 5 minutes instead of 30 seconds
 
     // Cleanup interval on unmount
     return () => {
