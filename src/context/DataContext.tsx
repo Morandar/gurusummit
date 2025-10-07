@@ -348,70 +348,110 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   // --- Supabase fetchers ---
   const fetchUsers = async (totalBooths?: number) => {
-    console.log('👥 DataContext: Starting fetchUsers...');
+    console.log('👥 DataContext: Starting optimized fetchUsers...');
     const usersStartTime = Date.now();
 
-    // Fetch users first
-    const { data: usersData, error: usersError } = await supabase
-      .from('users')
-      .select('*')
-      .order('id')
-      .limit(1000);
+    try {
+      // Fetch users first (limit to reasonable number)
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('*')
+        .order('id')
+        .limit(500); // Reduced limit to prevent overload
 
-    if (usersError || !usersData) {
-      console.error('❌ DataContext: Error fetching users:', usersError);
-      return;
-    }
+      if (usersError || !usersData) {
+        console.error('❌ DataContext: Error fetching users:', usersError);
+        return;
+      }
 
-    console.log(`👥 DataContext: Fetched ${usersData.length} users from database`);
+      console.log(`👥 DataContext: Fetched ${usersData.length} users from database`);
 
-    // Fetch all visits in a single query
-    const { data: visitsData, error: visitsError } = await supabase
-      .from('visits')
-      .select('attendee_id, booth_id')
-      .limit(10000); // Reasonable limit
+      // For performance, fetch visit counts aggregated by user instead of all individual visits
+      const { data: visitCountsData, error: visitCountsError } = await supabase
+        .rpc('get_user_visit_counts'); // Try to use a stored procedure if available
 
-    if (visitsError) {
-      console.warn('⚠️ DataContext: Could not fetch visits, proceeding without visit data:', visitsError);
-    }
+      let visitsByUser: { [userId: number]: number } = {};
 
-    console.log(`👥 DataContext: Fetched ${visitsData?.length || 0} visits from database`);
+      if (visitCountsError) {
+        console.warn('⚠️ DataContext: RPC not available, falling back to grouped query');
 
-    // Group visits by user ID for efficient lookup
-    const visitsByUser: { [userId: number]: number[] } = {};
-    if (visitsData) {
-      visitsData.forEach((visit: any) => {
-        if (!visitsByUser[visit.attendee_id]) {
-          visitsByUser[visit.attendee_id] = [];
+        // Fallback: Group visits by attendee_id and count them
+        const { data: visitsData, error: visitsError } = await supabase
+          .from('visits')
+          .select('attendee_id')
+          .limit(5000); // Limit to prevent excessive data
+
+        if (!visitsError && visitsData) {
+          visitsData.forEach((visit: any) => {
+            visitsByUser[visit.attendee_id] = (visitsByUser[visit.attendee_id] || 0) + 1;
+          });
+          console.log(`👥 DataContext: Processed ${visitsData.length} visits into counts`);
+        } else {
+          console.warn('⚠️ DataContext: Could not fetch visit counts:', visitsError);
         }
-        visitsByUser[visit.attendee_id].push(visit.booth_id);
+      } else {
+        // Use the RPC result
+        visitCountsData?.forEach((count: any) => {
+          visitsByUser[count.user_id] = count.visit_count;
+        });
+        console.log('👥 DataContext: Used RPC for visit counts');
+      }
+
+      // For detailed booth lists, fetch only for users with reasonable visit counts
+      const usersNeedingDetails = usersData.filter((user: any) =>
+        (visitsByUser[user.id] || 0) > 0 && (visitsByUser[user.id] || 0) < 50
+      );
+
+      const detailedVisits: { [userId: number]: number[] } = {};
+
+      if (usersNeedingDetails.length > 0) {
+        console.log(`👥 DataContext: Fetching detailed visits for ${usersNeedingDetails.length} users`);
+
+        // Fetch detailed visits only for users who need them
+        const userIds = usersNeedingDetails.map((u: any) => u.id);
+        const { data: detailedVisitsData, error: detailedError } = await supabase
+          .from('visits')
+          .select('attendee_id, booth_id')
+          .in('attendee_id', userIds)
+          .limit(2000);
+
+        if (!detailedError && detailedVisitsData) {
+          detailedVisitsData.forEach((visit: any) => {
+            if (!detailedVisits[visit.attendee_id]) {
+              detailedVisits[visit.attendee_id] = [];
+            }
+            detailedVisits[visit.attendee_id].push(visit.booth_id);
+          });
+        }
+      }
+
+      const boothCount = totalBooths || booths.length;
+
+      const mappedUsers = usersData.map((user: any) => {
+        const visitCount = visitsByUser[user.id] || 0;
+        const visitedBooths = detailedVisits[user.id] || [];
+
+        return {
+          id: user.id,
+          personalNumber: user.personalnumber,
+          firstName: user.firstname,
+          lastName: user.lastname,
+          position: user.position,
+          visits: visitCount,
+          progress: boothCount > 0 ? Math.round((visitCount / boothCount) * 100) : 0,
+          visitedBooths: visitedBooths, // Only detailed for users with reasonable counts
+          profileImage: user.profileimage,
+          password_hash: user.password_hash
+        };
       });
+
+      const endTime = Date.now();
+      console.log(`👥 DataContext: Total optimized fetchUsers time: ${endTime - usersStartTime}ms`);
+
+      setUsersState(mappedUsers);
+    } catch (error) {
+      console.error('❌ DataContext: Unexpected error in fetchUsers:', error);
     }
-
-    const boothCount = totalBooths || booths.length;
-
-    const mappedUsers = usersData.map((user: any) => {
-      const visitedBooths = visitsByUser[user.id] || [];
-
-      return {
-        id: user.id,
-        personalNumber: user.personalnumber,
-        firstName: user.firstname,
-        lastName: user.lastname,
-        position: user.position,
-        // Calculate from actual visits table
-        visits: visitedBooths.length,
-        progress: boothCount > 0 ? Math.round((visitedBooths.length / boothCount) * 100) : 0,
-        visitedBooths: visitedBooths,
-        profileImage: user.profileimage,
-        password_hash: user.password_hash
-      };
-    });
-
-    const endTime = Date.now();
-    console.log(`👥 DataContext: Total fetchUsers time: ${endTime - usersStartTime}ms`);
-
-    setUsersState(mappedUsers);
   };
 
   const fetchBooths = async () => {
