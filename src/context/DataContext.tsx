@@ -668,7 +668,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         console.log('📊 DataContext: Fetching booth count...');
-        const { data: boothsData } = await supabase.from('booths').select('*').order('id');
+        const { data: boothsData, error: boothsError } = await supabase.from('booths').select('*').order('id');
+        if (boothsError) {
+          console.error('❌ DataContext: Error fetching booth count:', boothsError);
+          return;
+        }
         const totalBooths = boothsData?.length || 0;
         console.log(`📊 DataContext: Found ${totalBooths} booths`);
 
@@ -707,7 +711,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         const totalTime = Date.now() - startTime;
         console.log(`✅ DataContext: All data fetched successfully in ${totalTime}ms`);
       } catch (error) {
-        console.error('❌ DataContext: Error fetching data:', error);
+        console.error('❌ DataContext: Unexpected error in fetchData:', error);
       } finally {
         console.log('🔄 DataContext: Setting isLoading to false');
         setIsLoading(false);
