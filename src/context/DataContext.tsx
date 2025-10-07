@@ -190,6 +190,41 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [booths, setBooths] = useState<Booth[]>([]);
   const [program, setProgramState] = useState<ProgramEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const fetchAllVisitRows = async (columns: string, filter?: (query: any) => any) => {
+    const pageSize = 1000;
+    const maxPages = 100;
+    let from = 0;
+    let combined: any[] = [];
+
+    for (let page = 0; page < maxPages; page++) {
+      let query: any = supabase.from('visits').select(columns);
+      if (filter) {
+        query = filter(query);
+      }
+
+      const { data, error } = await query.range(from, from + pageSize - 1);
+
+      if (error) {
+        console.warn('⚠️ DataContext: Error fetching paginated visits:', error);
+        return { data: combined, error };
+      }
+
+      if (!data || data.length === 0) {
+        break;
+      }
+
+      combined = combined.concat(data);
+
+      if (data.length < pageSize) {
+        break;
+      }
+
+      from += pageSize;
+    }
+
+    return { data: combined, error: null };
+  };
   
   // Přidání uživatele adminem: pouze základní pole, heslo volitelné
   const addUserByAdmin = async (userData: { personalNumber: string; firstName: string; lastName: string; position: string; password?: string }) => {
@@ -394,18 +429,15 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (visitCountsError) {
         console.warn('⚠️ DataContext: RPC not available, falling back to grouped query');
 
-        // Fallback: Group visits by attendee_id and count them (no limit to get all)
-        const { data: visitsData, error: visitsError } = await supabase
-          .from('visits')
-          .select('attendee_id'); // Remove all limits to get ALL records
+        const { data: visitsData, error: visitsError } = await fetchAllVisitRows('attendee_id');
 
-        if (!visitsError && visitsData) {
+        if (!visitsError && visitsData.length > 0) {
           visitsData.forEach((visit: any) => {
             visitsByUser[visit.attendee_id] = (visitsByUser[visit.attendee_id] || 0) + 1;
           });
           console.log(`👥 DataContext: Processed ${visitsData.length} visits into counts`);
           console.log('👥 DataContext: Sample visit counts:', Object.entries(visitsByUser).slice(0, 3)); // Debug first 3
-        } else {
+        } else if (visitsError) {
           console.warn('⚠️ DataContext: Could not fetch visit counts:', visitsError);
         }
       } else {
@@ -453,7 +485,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           id: user.id,
           personalNumber: user.personalnumber,
           firstName: user.firstname,
-          lastName: user.lastName,
+          lastName: user.lastname,
           position: user.position,
           visits: visitCount,
           progress: boothCount > 0 ? Math.round((visitCount / boothCount) * 100) : 0,
@@ -496,12 +528,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.log(`🏪 DataContext: Fetched ${boothsData?.length || 0} booths from database`);
 
       // Get visit counts for all booths (no limit to get all)
-      const { data: visitsData, error: visitsError } = await supabase
-        .from('visits')
-        .select('booth_id'); // Remove limit to get ALL booth visits
-
       const visitCounts: { [boothId: number]: number } = {};
-      if (!visitsError && visitsData) {
+      const { data: visitsData, error: visitsError } = await fetchAllVisitRows('booth_id');
+      if (!visitsError && visitsData.length > 0) {
         visitsData.forEach((visit: any) => {
           visitCounts[visit.booth_id] = (visitCounts[visit.booth_id] || 0) + 1;
         });
