@@ -348,93 +348,78 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   // --- Supabase fetchers ---
   const fetchUsers = async (totalBooths?: number) => {
-    console.log('👥 DataContext: Starting simplified fetchUsers (no visits for speed)...');
+    console.log('👥 DataContext: Starting fetchUsers...');
     const usersStartTime = Date.now();
 
-    try {
-      // First, just fetch users without visits to avoid timeout
-      const { data: usersData, error: usersError } = await supabase
-        .from('users')
-        .select('*')
-        .order('id')
-        .limit(1000); // Limit to prevent excessive data
+    // Fetch users first
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('*')
+      .order('id')
+      .limit(1000);
 
-      if (usersError) {
-        console.error('❌ DataContext: Error fetching users:', usersError);
-        return;
-      }
+    if (usersError || !usersData) {
+      console.error('❌ DataContext: Error fetching users:', usersError);
+      return;
+    }
 
-      console.log(`👥 DataContext: Fetched ${usersData?.length || 0} users from database`);
+    console.log(`👥 DataContext: Fetched ${usersData.length} users from database`);
 
-      const boothCount = totalBooths || booths.length;
+    // Fetch all visits in a single query
+    const { data: visitsData, error: visitsError } = await supabase
+      .from('visits')
+      .select('attendee_id, booth_id')
+      .limit(10000); // Reasonable limit
 
-      // Map users without visit data initially (for speed)
-      const mappedUsers = (usersData || []).map((user: any) => ({
+    if (visitsError) {
+      console.warn('⚠️ DataContext: Could not fetch visits, proceeding without visit data:', visitsError);
+    }
+
+    console.log(`👥 DataContext: Fetched ${visitsData?.length || 0} visits from database`);
+
+    // Group visits by user ID for efficient lookup
+    const visitsByUser: { [userId: number]: number[] } = {};
+    if (visitsData) {
+      visitsData.forEach((visit: any) => {
+        if (!visitsByUser[visit.attendee_id]) {
+          visitsByUser[visit.attendee_id] = [];
+        }
+        visitsByUser[visit.attendee_id].push(visit.booth_id);
+      });
+    }
+
+    const boothCount = totalBooths || booths.length;
+
+    const mappedUsers = usersData.map((user: any) => {
+      const visitedBooths = visitsByUser[user.id] || [];
+
+      return {
         id: user.id,
         personalNumber: user.personalnumber,
         firstName: user.firstname,
         lastName: user.lastname,
         position: user.position,
-        visits: 0, // Will be updated later if needed
-        progress: 0,
-        visitedBooths: [],
+        // Calculate from actual visits table
+        visits: visitedBooths.length,
+        progress: boothCount > 0 ? Math.round((visitedBooths.length / boothCount) * 100) : 0,
+        visitedBooths: visitedBooths,
         profileImage: user.profileimage,
         password_hash: user.password_hash
-      }));
+      };
+    });
 
-      const endTime = Date.now();
-      console.log(`👥 DataContext: Total simplified fetchUsers time: ${endTime - usersStartTime}ms`);
+    const endTime = Date.now();
+    console.log(`👥 DataContext: Total fetchUsers time: ${endTime - usersStartTime}ms`);
 
-      setUsersState(mappedUsers);
-
-      // Optionally load visit data in background (non-blocking)
-      // This prevents the loading screen from hanging
-      setTimeout(async () => {
-        try {
-          console.log('👥 DataContext: Loading visit data in background...');
-          const { data: visitsData, error: visitsError } = await supabase
-            .from('visits')
-            .select('attendee_id, booth_id')
-            .limit(5000); // Reasonable limit
-
-          if (!visitsError && visitsData) {
-            const visitsByUser: { [userId: number]: number[] } = {};
-            visitsData.forEach((visit: any) => {
-              if (!visitsByUser[visit.attendee_id]) {
-                visitsByUser[visit.attendee_id] = [];
-              }
-              visitsByUser[visit.attendee_id].push(visit.booth_id);
-            });
-
-            setUsersState(prevUsers =>
-              prevUsers.map(user => {
-                const visitedBooths = visitsByUser[user.id] || [];
-                return {
-                  ...user,
-                  visits: visitedBooths.length,
-                  progress: boothCount > 0 ? Math.round((visitedBooths.length / boothCount) * 100) : 0,
-                  visitedBooths: visitedBooths
-                };
-              })
-            );
-            console.log('👥 DataContext: Visit data loaded successfully in background');
-          }
-        } catch (error) {
-          console.warn('⚠️ DataContext: Could not load visit data in background:', error);
-        }
-      }, 1000); // Delay to prioritize initial load
-
-    } catch (error) {
-      console.error('❌ DataContext: Unexpected error in fetchUsers:', error);
-    }
+    setUsersState(mappedUsers);
   };
 
   const fetchBooths = async () => {
-    console.log('🏪 DataContext: Starting simplified fetchBooths...');
+    console.log('🏪 DataContext: Starting fetchBooths with visit counts...');
     const startTime = Date.now();
 
     try {
-      // Fetch booths first (without visit counts for speed)
+      // Fetch booths with their visit counts using a single query
       const { data: boothsData, error: boothsError } = await supabase
         .from('booths')
         .select('*')
@@ -447,45 +432,31 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       console.log(`🏪 DataContext: Fetched ${boothsData?.length || 0} booths from database`);
 
-      // Set booths without visit counts initially
-      const boothsWithoutVisits = (boothsData || []).map((booth: any) => ({
+      // Get visit counts for all booths
+      const { data: visitsData, error: visitsError } = await supabase
+        .from('visits')
+        .select('booth_id');
+
+      const visitCounts: { [boothId: number]: number } = {};
+      if (!visitsError && visitsData) {
+        visitsData.forEach((visit: any) => {
+          visitCounts[visit.booth_id] = (visitCounts[visit.booth_id] || 0) + 1;
+        });
+      } else if (visitsError) {
+        console.warn('⚠️ DataContext: Could not fetch visits for booths:', visitsError);
+      }
+
+      console.log(`🏪 DataContext: Processed visit counts for ${Object.keys(visitCounts).length} booths`);
+
+      const boothsWithVisits = (boothsData || []).map((booth: any) => ({
         ...booth,
-        visits: 0 // Will be updated later
+        visits: visitCounts[booth.id] || 0
       }));
 
-      setBooths(boothsWithoutVisits as any);
-
       const endTime = Date.now();
-      console.log(`🏪 DataContext: Total simplified fetchBooths time: ${endTime - startTime}ms`);
+      console.log(`🏪 DataContext: Total fetchBooths time: ${endTime - startTime}ms`);
 
-      // Load visit counts in background (non-blocking)
-      setTimeout(async () => {
-        try {
-          console.log('🏪 DataContext: Loading booth visit counts in background...');
-          const { data: visitsData, error: visitsError } = await supabase
-            .from('visits')
-            .select('booth_id')
-            .limit(5000);
-
-          if (!visitsError && visitsData) {
-            const visitCounts: { [boothId: number]: number } = {};
-            visitsData.forEach((visit: any) => {
-              visitCounts[visit.booth_id] = (visitCounts[visit.booth_id] || 0) + 1;
-            });
-
-            setBooths(prevBooths =>
-              prevBooths.map(booth => ({
-                ...booth,
-                visits: visitCounts[booth.id] || 0
-              }))
-            );
-            console.log('🏪 DataContext: Booth visit counts loaded successfully in background');
-          }
-        } catch (error) {
-          console.warn('⚠️ DataContext: Could not load booth visit counts in background:', error);
-        }
-      }, 500); // Shorter delay
-
+      setBooths(boothsWithVisits as any);
     } catch (error) {
       console.error('❌ DataContext: Unexpected error in fetchBooths:', error);
     }
@@ -778,18 +749,24 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const visitBooth = async (userId: number, boothId: number) => {
+    console.log(`🏪 DataContext: visitBooth called - userId: ${userId}, boothId: ${boothId}`);
+
     const targetBooth = booths.find(b => b.id === boothId);
     const targetUser = users.find(u => u.id === userId);
+
     if (!targetUser) {
+      console.error('❌ DataContext: User not found for visitBooth');
       toast({ title: 'Uživatel nenalezen', description: 'Zkuste akci zopakovat.' });
       return;
     }
     if (!targetBooth) {
+      console.error('❌ DataContext: Booth not found for visitBooth');
       toast({ title: 'Stánek nenalezen', description: 'Zkuste akci zopakovat.' });
       return;
     }
 
     try {
+      console.log('💾 DataContext: Inserting visit into database...');
       // Try to insert new visit into database
       // If it already exists, the unique constraint will be violated
       const { error: insertError } = await supabase
@@ -803,14 +780,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (insertError) {
         // Check if it's a unique constraint violation (user already visited this booth)
         if (insertError.code === '23505') { // PostgreSQL unique constraint violation
+          console.log('⚠️ DataContext: User already visited this booth');
           toast({ title: 'Již navštíveno', description: 'Tento stánek jste již navštívili.' });
           return;
         }
 
-        console.error('Error inserting visit:', insertError);
+        console.error('❌ DataContext: Error inserting visit:', insertError);
         toast({ title: 'Chyba při ukládání návštěvy', description: insertError.message });
         return;
       }
+
+      console.log('✅ DataContext: Visit inserted successfully, updating local state...');
 
       // Update local state - add to user's visited booths
       setUsers(prevUsers => prevUsers.map(user => {
@@ -820,6 +800,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
         const newVisitedBooths = [...user.visitedBooths, boothId];
         const newProgress = booths.length > 0 ? Math.round((newVisitedBooths.length / booths.length) * 100) : 0;
+        console.log(`📊 DataContext: Updated user progress: ${newProgress}% (${newVisitedBooths.length}/${booths.length})`);
         return {
           ...user,
           visitedBooths: newVisitedBooths,
@@ -831,19 +812,21 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       // Update progress in database to keep it in sync
       const newVisitedBooths = [...targetUser.visitedBooths, boothId];
       const newProgress = booths.length > 0 ? Math.round((newVisitedBooths.length / booths.length) * 100) : 0;
+      console.log('💾 DataContext: Updating user progress in database...');
       await supabase
         .from('users')
         .update({ progress: newProgress, visits: targetUser.visits + 1 })
         .eq('id', userId);
 
-      // Update booth visit count in local state  
+      // Update booth visit count in local state
       setBooths(prevBooths => prevBooths.map(booth => (
         booth.id === boothId ? { ...booth, visits: booth.visits + 1 } : booth
       )));
 
+      console.log('✅ DataContext: Booth visit completed successfully');
       toast({ title: 'Stánek navštíven!', description: 'Váš pokrok byl aktualizován.' });
     } catch (error) {
-      console.error('Visit booth error:', error);
+      console.error('❌ DataContext: Visit booth error:', error);
       toast({ title: 'Chyba při návštěvě stánku', description: 'Nastala neočekávaná chyba.' });
     }
   };
