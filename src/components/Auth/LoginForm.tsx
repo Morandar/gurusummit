@@ -91,9 +91,9 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <Card className="shadow-card border-0">
-        <CardHeader className="text-center bg-gradient-primary rounded-t-lg text-white">
-          <CardTitle className="text-2xl font-bold">O2 Guru Summit 2025</CardTitle>
+      <Card className="shadow-card border border-border/70 rounded-3xl overflow-hidden">
+        <CardHeader className="text-center bg-gradient-primary rounded-t-3xl text-white">
+          <CardTitle className="text-2xl font-black">O2 Guru Summit 2025</CardTitle>
           <CardDescription className="text-white/90">
             Přihlaste se do aplikace summitu
           </CardDescription>
@@ -212,7 +212,7 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
 
                 <Button 
                   type="submit" 
-                  className="w-full bg-primary hover:bg-primary-hover transition-colors"
+                  className="w-full bg-primary hover:bg-primary-hover"
                   disabled={isLoading}
                 >
                   {isLoading ? 'Přihlašování...' : (isRegistering ? 'Registrovat se' : 'Přihlásit se')}
@@ -258,7 +258,7 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
                 </div>
                 <Button 
                   type="submit" 
-                  className="w-full bg-secondary hover:bg-secondary-hover transition-colors"
+                  className="w-full bg-secondary hover:bg-secondary-hover"
                   disabled={isLoading}
                 >
                   {isLoading ? 'Přihlašování...' : 'Přihlásit se jako stánek'}
@@ -295,7 +295,7 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
                 </div>
                 <Button 
                   type="submit" 
-                  className="w-full bg-gradient-primary hover:opacity-90 transition-opacity"
+                  className="w-full bg-gradient-primary hover:opacity-90"
                   disabled={isLoading}
                 >
                   {isLoading ? 'Přihlašování...' : 'Přihlásit se jako admin'}

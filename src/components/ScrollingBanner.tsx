@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Banner } from '@/context/DataContext';
 import { useAuth } from '@/context/AuthContext';
 
@@ -7,12 +7,9 @@ interface ScrollingBannerProps {
 }
 
 export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
-  const [scrollPosition, setScrollPosition] = useState(100);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
   const { user } = useAuth();
 
-  // Color schemes for visual distinction
   const getColorScheme = (color: string) => {
     switch (color) {
       case 'blue-purple':
@@ -30,15 +27,12 @@ export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
     }
   };
 
-  // Determine which banners to show based on user type
   const getAppropriateBanners = (): Banner[] => {
     if (!banners || banners.length === 0) return [];
 
-    // Determine user type and map to banner audience
-    const userType = user?.type || 'participant'; // Default to participant if no user
+    const userType = user?.type || 'participant';
     let bannerAudience: 'all' | 'participants' | 'booth_staff';
 
-    // Map user types to banner audiences
     switch (userType) {
       case 'participant':
         bannerAudience = 'participants';
@@ -47,77 +41,61 @@ export const ScrollingBanner = ({ banners }: ScrollingBannerProps) => {
         bannerAudience = 'booth_staff';
         break;
       case 'admin':
-        bannerAudience = 'all'; // Admins see all banners
+        bannerAudience = 'all';
         break;
       default:
         bannerAudience = 'participants';
     }
 
-
-    // Get all banners for this user type
-    const userTypeBanners = banners.filter(banner =>
-      (banner.targetAudience === bannerAudience || banner.targetAudience === 'all') && banner.isActive
+    return banners.filter(
+      banner =>
+        (banner.targetAudience === bannerAudience || banner.targetAudience === 'all') && banner.isActive
     );
-
-    return userTypeBanners;
   };
 
-  const appropriateBanners = getAppropriateBanners();
+  const appropriateBanners = useMemo(() => getAppropriateBanners(), [banners, user?.type]);
   const currentBanner = appropriateBanners[currentBannerIndex];
 
-
+  useEffect(() => {
+    if (currentBannerIndex >= appropriateBanners.length) {
+      setCurrentBannerIndex(0);
+    }
+  }, [currentBannerIndex, appropriateBanners.length]);
 
   useEffect(() => {
-    if (!currentBanner?.text) {
-      return;
-    }
-
-
+    if (appropriateBanners.length <= 1) return;
+    const rotationMs = 20_000;
     const interval = setInterval(() => {
-      setScrollPosition(prev => {
-        if (isPaused) return prev; // Don't move if paused
-
-        // Move from right to left (negative values)
-        const newPosition = prev - 1;
-
-        // When text has scrolled completely off screen, pause and switch
-        if (newPosition < -800) { // Adjust based on text length
-          setIsPaused(true);
-          setTimeout(() => {
-            if (appropriateBanners.length > 1) {
-              setCurrentBannerIndex(prev => (prev + 1) % appropriateBanners.length);
-            }
-            setScrollPosition(100); // Reset to start from right
-            setIsPaused(false);
-          }, 2000); // 2 second pause before next banner
-          return prev; // Keep current position during pause
-        }
-
-        return newPosition;
-      });
-    }, 30); // Smoother animation with 30ms intervals
-
+      setCurrentBannerIndex(prev => (prev + 1) % appropriateBanners.length);
+    }, rotationMs);
     return () => clearInterval(interval);
-  }, [currentBanner?.text, isPaused, appropriateBanners.length]);
+  }, [appropriateBanners.length]);
 
   if (!currentBanner?.text) {
     return null;
   }
 
+  const marqueeStyle = { ['--marquee-duration' as any]: '20s' };
+  const bannerChunks = Array.from({ length: 4 }, (_, index) => (
+    <span key={index} className="mx-6 inline-flex items-center gap-3 text-sm font-semibold tracking-wide">
+      <span aria-hidden="true">📢</span>
+      <span>{currentBanner.text}</span>
+    </span>
+  ));
+
   return (
     <div className={`${getColorScheme(currentBanner?.color || 'blue-purple')} text-white py-2 px-4 shadow-lg border-b relative overflow-hidden`}>
       <div className="max-w-7xl mx-auto">
-        <div className="relative">
+        <div className="relative overflow-hidden">
           <div
-            className="inline-block text-sm font-medium whitespace-nowrap"
-            style={{
-              transform: `translateX(${scrollPosition}px)`,
-              transition: 'none'
-            }}
+            className="flex w-max animate-marquee items-center whitespace-nowrap will-change-transform motion-reduce:animate-none"
+            style={marqueeStyle}
           >
-            📢&nbsp;&nbsp;&nbsp;{currentBanner.text}&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;{currentBanner.text}&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;{currentBanner.text}&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;{currentBanner.text}&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;{currentBanner.text}&nbsp;&nbsp;&nbsp;📢&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <div className="flex items-center">{bannerChunks}</div>
+            <div className="flex items-center" aria-hidden="true">
+              {bannerChunks}
+            </div>
           </div>
-          {/* Banner indicator for multiple banners */}
           {appropriateBanners.length > 1 && (
             <div className="absolute top-1 right-4 flex gap-1">
               {appropriateBanners.map((_, index) => (

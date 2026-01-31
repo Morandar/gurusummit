@@ -9,7 +9,7 @@ All colors MUST be HSL.
 @layer base {
   :root {
     /* O2 Brand Colors */
-    --background: 0 0% 100%;
+    --background: 210 40% 98%;
     --foreground: 220 15% 20%;
 
     --card: 0 0% 100%;
@@ -37,22 +37,22 @@ All colors MUST be HSL.
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
+    --border: 210 20% 94%;
+    --input: 210 20% 94%;
     --ring: 217 100% 40%;
 
     /* O2 Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(217 100% 40%), hsl(174 100% 35%));
-    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(210 40% 98%));
+    --gradient-subtle: linear-gradient(180deg, hsl(210 40% 99%), hsl(210 40% 97%));
     
     /* Shadows */
     --shadow-primary: 0 10px 30px -10px hsl(217 100% 40% / 0.3);
-    --shadow-card: 0 4px 20px -4px hsl(220 15% 20% / 0.1);
+    --shadow-card: 0 8px 24px -12px hsl(220 15% 20% / 0.18);
 
     /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
-    --radius: 0.5rem;
+    --radius: 1rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -117,7 +117,7 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
   }
 
   .animate-pulse-soft {
