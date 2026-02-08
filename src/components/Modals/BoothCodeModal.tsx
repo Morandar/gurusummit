@@ -1,11 +1,11 @@
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { KeyRound, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useData } from '@/context/DataContext';
+import { BoothQuestion, useData } from '@/context/DataContext';
 
 interface BoothCodeModalProps {
   isOpen: boolean;
@@ -17,9 +17,24 @@ interface BoothCodeModalProps {
 
 export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId }: BoothCodeModalProps) => {
   const [code, setCode] = useState('');
+  const [selectedAnswer, setSelectedAnswer] = useState<'a' | 'b' | 'c' | ''>('');
+  const [currentQuestion, setCurrentQuestion] = useState<BoothQuestion | null>(null);
   const { toast } = useToast();
   const { booths, isCodeEntryAllowed } = useData();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const booth = booths.find(b => b.id === boothId);
+    const questions = booth?.questions || [];
+    if (questions.length > 0) {
+      const randomIndex = Math.floor(Math.random() * questions.length);
+      setCurrentQuestion(questions[randomIndex]);
+    } else {
+      setCurrentQuestion(null);
+    }
+    setSelectedAnswer('');
+  }, [booths, boothId, isOpen]);
 
   const validateCode = (inputCode: string) => {
     const booth = booths.find(b => b.id === boothId);
@@ -48,6 +63,31 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
     }
 
     if (validateCode(code)) {
+      if (!currentQuestion) {
+        toast({
+          title: 'Chybí otázka',
+          description: 'Tento stánek nemá nastavené otázky. Kontaktujte obsluhu stánku.',
+          variant: 'destructive'
+        });
+        return;
+      }
+      if (!selectedAnswer) {
+        toast({
+          title: 'Vyberte odpověď',
+          description: 'Před potvrzením vyberte odpověď na otázku.',
+          variant: 'destructive'
+        });
+        return;
+      }
+      if (selectedAnswer !== currentQuestion.correct) {
+        toast({
+          title: 'Špatná odpověď',
+          description: 'Zvolená odpověď není správná. Zkuste to znovu.',
+          variant: 'destructive'
+        });
+        setSelectedAnswer('');
+        return;
+      }
       toast({
         title: 'Úspěch! 🎉',
         description: `Stánek "${boothName}" byl úspěšně navštíven! Získali jste 10 bodů.`,
@@ -67,6 +107,8 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
 
   const handleClose = () => {
     setCode('');
+    setSelectedAnswer('');
+    setCurrentQuestion(null);
     onClose();
   };
 
@@ -102,6 +144,37 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
                 <p className="text-green-600 font-semibold">✓ Funguje na všech zařízeních</p>
               </div>
             </div>
+            <div className="space-y-3">
+              <Label>Otázka</Label>
+              {currentQuestion ? (
+                <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-sm font-medium text-foreground">{currentQuestion.question}</p>
+                  <div className="space-y-2">
+                    {(['a', 'b', 'c'] as const).map(optionKey => (
+                      <label
+                        key={optionKey}
+                        className="flex items-start gap-2 rounded-md border border-transparent px-2 py-1.5 text-sm transition hover:border-muted-foreground/40"
+                      >
+                        <input
+                          type="radio"
+                          name="booth-question"
+                          value={optionKey}
+                          checked={selectedAnswer === optionKey}
+                          onChange={() => setSelectedAnswer(optionKey)}
+                          className="mt-0.5"
+                        />
+                        <span className="font-semibold uppercase">{optionKey}.</span>
+                        <span>{currentQuestion.options[optionKey]}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Tento stánek zatím nemá nastavené otázky.
+                </p>
+              )}
+            </div>
 
             <div className="flex space-x-2">
               <Button
@@ -116,7 +189,7 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
               <Button
                 type="submit"
                 className="flex-1 bg-secondary hover:bg-secondary-hover"
-                disabled={!code.trim()}
+                disabled={!code.trim() || !currentQuestion || !selectedAnswer}
               >
                 Potvrdit
               </Button>

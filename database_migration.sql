@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS public.booths (
     password TEXT,
     logo TEXT,
     category TEXT,
+    questions JSONB DEFAULT '[]'::jsonb,
     visits INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );

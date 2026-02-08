@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { LogOut, Users, Building, Calendar, BarChart3, Download, RotateCcw, Plus, Edit, Trash2, Trophy, User, Image, Eye, Smartphone, Presentation, Coffee, Wrench, Users2, Award, FileText, FileSpreadsheet } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useData, Banner } from '@/context/DataContext';
+import { useData, Banner, BoothQuestion } from '@/context/DataContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -48,7 +48,16 @@ export const AdminDashboard = () => {
 
   // Form states
   const [userForm, setUserForm] = useState({ firstName: '', lastName: '', personalNumber: '', position: '' });
-  const [boothForm, setBoothForm] = useState({ name: '', code: '', login: '', category: '', password: '', logo: '' });
+  const [boothForm, setBoothForm] = useState({
+    name: '',
+    code: '',
+    login: '',
+    category: '',
+    password: '',
+    logo: '',
+    questions: [] as BoothQuestion[]
+  });
+  const [boothQuestionsDraft, setBoothQuestionsDraft] = useState('');
   const [eventForm, setEventForm] = useState({ time: '', event: '', duration: 30, category: 'lecture' });
   const [phoneForm, setPhoneForm] = useState({
     manufacturerName: '',
@@ -73,6 +82,37 @@ export const AdminDashboard = () => {
   // Local draft state for homepage texts
   const [homePageTextsDraft, setHomePageTextsDraft] = useState(homePageTexts);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  const formatBoothQuestions = (questions: BoothQuestion[]) => {
+    if (!questions || questions.length === 0) {
+      return '';
+    }
+    return JSON.stringify(questions, null, 2);
+  };
+
+  const parseBoothQuestions = (rawValue: string) => {
+    if (!rawValue.trim()) {
+      return [] as BoothQuestion[];
+    }
+    try {
+      const parsed = JSON.parse(rawValue) as BoothQuestion[];
+      if (!Array.isArray(parsed)) {
+        return null;
+      }
+      const isValid = parsed.every(question =>
+        question &&
+        typeof question.question === 'string' &&
+        question.options &&
+        typeof question.options.a === 'string' &&
+        typeof question.options.b === 'string' &&
+        typeof question.options.c === 'string' &&
+        ['a', 'b', 'c'].includes(question.correct)
+      );
+      return isValid ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  };
 
   // Calculate real-time stats
   const stats = {
@@ -276,8 +316,10 @@ export const AdminDashboard = () => {
       login: booth.login, 
       category: booth.category || '',
       password: booth.password || '',
-      logo: booth.logo || ''
+      logo: booth.logo || '',
+      questions: booth.questions || []
     });
+    setBoothQuestionsDraft(formatBoothQuestions(booth.questions || []));
     setEditBoothDialog({ open: true, booth });
   };
 
@@ -337,17 +379,29 @@ export const AdminDashboard = () => {
 
   const handleSaveBooth = async () => {
     try {
+      const parsedQuestions = parseBoothQuestions(boothQuestionsDraft);
+      if (parsedQuestions === null) {
+        toast({
+          title: 'Chyba ve formátu otázek',
+          description: 'Zkontrolujte, že otázky jsou validní JSON pole s možnostmi a, b, c a správnou odpovědí.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const boothPayload = { ...boothForm, questions: parsedQuestions };
       if (editBoothDialog.booth) {
         // Update existing booth in Supabase
         const { error } = await supabase
           .from('booths')
           .update({
-            name: boothForm.name,
-            code: boothForm.code,
-            login: boothForm.login,
-            category: boothForm.category || null,
-            password: boothForm.password || null,
-            logo: boothForm.logo || null
+            name: boothPayload.name,
+            code: boothPayload.code,
+            login: boothPayload.login,
+            category: boothPayload.category || null,
+            password: boothPayload.password || null,
+            logo: boothPayload.logo || null,
+            questions: boothPayload.questions
           })
           .eq('id', editBoothDialog.booth.id);
 
@@ -359,13 +413,13 @@ export const AdminDashboard = () => {
         // Update local state only if database update succeeded
         setBooths(prev => prev.map(booth => 
           booth.id === editBoothDialog.booth.id 
-            ? { ...booth, ...boothForm }
+            ? { ...booth, ...boothPayload }
             : booth
         ));
         toast({ title: 'Stánek upraven', description: 'Změny byly uloženy' });
       } else {
         // Create new booth
-        const { data, error } = await supabase.from('booths').insert([{ ...boothForm, visits: 0 }]).select();
+        const { data, error } = await supabase.from('booths').insert([{ ...boothPayload, visits: 0 }]).select();
         if (error) {
           toast({ title: 'Chyba při vytváření stánku', description: error.message });
           return;
@@ -373,14 +427,15 @@ export const AdminDashboard = () => {
         
         // Update local state with new booth
         if (data && data[0]) {
-          setBooths(prev => [...prev, { ...boothForm, id: data[0].id, visits: 0 }]);
+          setBooths(prev => [...prev, { ...boothPayload, id: data[0].id, visits: 0 }]);
           toast({ title: 'Stánek přidán', description: 'Nový stánek byl vytvořen' });
         }
       }
       
       setEditBoothDialog({ open: false, booth: null });
       setAddBoothDialog(false);
-      setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '' });
+      setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [] });
+      setBoothQuestionsDraft('');
     } catch (error) {
       console.error('Save booth error:', error);
       toast({ title: 'Chyba při ukládání stánku', description: 'Nastala neočekávaná chyba' });
@@ -1046,7 +1101,11 @@ export const AdminDashboard = () => {
                   <Download className="h-4 w-4 mr-2" />
                   Export CSV
                 </Button>
-                <Button onClick={() => setAddBoothDialog(true)}>
+                <Button onClick={() => {
+                  setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [] });
+                  setBoothQuestionsDraft('');
+                  setAddBoothDialog(true);
+                }}>
                   <Plus className="h-4 w-4 mr-2" />
                   Přidat stánek
                 </Button>
@@ -1935,7 +1994,16 @@ export const AdminDashboard = () => {
         </Dialog>
 
         {/* Edit Booth Dialog */}
-        <Dialog open={editBoothDialog.open} onOpenChange={(open) => setEditBoothDialog({ open, booth: null })}>
+        <Dialog
+          open={editBoothDialog.open}
+          onOpenChange={(open) => {
+            setEditBoothDialog({ open, booth: null });
+            if (!open) {
+              setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [] });
+              setBoothQuestionsDraft('');
+            }
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Upravit stánek</DialogTitle>
@@ -1980,6 +2048,21 @@ export const AdminDashboard = () => {
                   placeholder="Zadejte heslo pro stánek"
                 />
               </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="booth-questions" className="text-right pt-2">Otázky</Label>
+                <div className="col-span-3 space-y-2">
+                  <Textarea
+                    id="booth-questions"
+                    value={boothQuestionsDraft}
+                    onChange={(e) => setBoothQuestionsDraft(e.target.value)}
+                    placeholder='[{"question":"Otázka","options":{"a":"Možnost A","b":"Možnost B","c":"Možnost C"},"correct":"a"}]'
+                    className="min-h-[140px] font-mono text-xs"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Zadejte pole otázek ve formátu JSON. Každá otázka musí mít text, možnosti a, b, c a správnou odpověď.
+                  </p>
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditBoothDialog({ open: false, booth: null })}>
@@ -1991,7 +2074,16 @@ export const AdminDashboard = () => {
         </Dialog>
 
         {/* Add Booth Dialog */}
-        <Dialog open={addBoothDialog} onOpenChange={setAddBoothDialog}>
+        <Dialog
+          open={addBoothDialog}
+          onOpenChange={(open) => {
+            setAddBoothDialog(open);
+            if (open) {
+              setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [] });
+              setBoothQuestionsDraft('');
+            }
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Přidat stánek</DialogTitle>
@@ -2035,6 +2127,21 @@ export const AdminDashboard = () => {
                   className="col-span-3"
                   placeholder="Zadejte heslo pro stánek"
                 />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="add-booth-questions" className="text-right pt-2">Otázky</Label>
+                <div className="col-span-3 space-y-2">
+                  <Textarea
+                    id="add-booth-questions"
+                    value={boothQuestionsDraft}
+                    onChange={(e) => setBoothQuestionsDraft(e.target.value)}
+                    placeholder='[{"question":"Otázka","options":{"a":"Možnost A","b":"Možnost B","c":"Možnost C"},"correct":"a"}]'
+                    className="min-h-[140px] font-mono text-xs"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Zadejte pole otázek ve formátu JSON. Každá otázka musí mít text, možnosti a, b, c a správnou odpověď.
+                  </p>
+                </div>
               </div>
             </div>
             <DialogFooter>
