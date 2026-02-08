@@ -19,7 +19,6 @@ import { LotteryWheel } from './LotteryWheel';
 import { WinnersModal } from './WinnersModal';
 import { ImageUploadModal } from '@/components/Modals/ImageUploadModal';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 
 export const AdminDashboard = () => {
   const { logout } = useAuth();
@@ -57,7 +56,6 @@ export const AdminDashboard = () => {
     logo: '',
     questions: [] as BoothQuestion[]
   });
-  const [boothQuestionsDraft, setBoothQuestionsDraft] = useState('');
   const [eventForm, setEventForm] = useState({ time: '', event: '', duration: 30, category: 'lecture' });
   const [phoneForm, setPhoneForm] = useState({
     manufacturerName: '',
@@ -83,35 +81,44 @@ export const AdminDashboard = () => {
   const [homePageTextsDraft, setHomePageTextsDraft] = useState(homePageTexts);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  const formatBoothQuestions = (questions: BoothQuestion[]) => {
-    if (!questions || questions.length === 0) {
-      return '';
-    }
-    return JSON.stringify(questions, null, 2);
+  const createEmptyQuestion = (): BoothQuestion => ({
+    question: '',
+    options: { a: '', b: '', c: '' },
+    correct: 'a'
+  });
+
+  const updateQuestion = (index: number, update: Partial<BoothQuestion>) => {
+    setBoothForm(prev => ({
+      ...prev,
+      questions: prev.questions.map((question, idx) =>
+        idx === index ? { ...question, ...update } : question
+      )
+    }));
   };
 
-  const parseBoothQuestions = (rawValue: string) => {
-    if (!rawValue.trim()) {
-      return [] as BoothQuestion[];
-    }
-    try {
-      const parsed = JSON.parse(rawValue) as BoothQuestion[];
-      if (!Array.isArray(parsed)) {
-        return null;
-      }
-      const isValid = parsed.every(question =>
-        question &&
-        typeof question.question === 'string' &&
-        question.options &&
-        typeof question.options.a === 'string' &&
-        typeof question.options.b === 'string' &&
-        typeof question.options.c === 'string' &&
-        ['a', 'b', 'c'].includes(question.correct)
-      );
-      return isValid ? parsed : null;
-    } catch (error) {
-      return null;
-    }
+  const updateQuestionOption = (index: number, optionKey: 'a' | 'b' | 'c', value: string) => {
+    setBoothForm(prev => ({
+      ...prev,
+      questions: prev.questions.map((question, idx) =>
+        idx === index
+          ? { ...question, options: { ...question.options, [optionKey]: value } }
+          : question
+      )
+    }));
+  };
+
+  const addQuestion = () => {
+    setBoothForm(prev => ({
+      ...prev,
+      questions: [...prev.questions, createEmptyQuestion()]
+    }));
+  };
+
+  const removeQuestion = (index: number) => {
+    setBoothForm(prev => ({
+      ...prev,
+      questions: prev.questions.filter((_, idx) => idx !== index)
+    }));
   };
 
   // Calculate real-time stats
@@ -317,9 +324,8 @@ export const AdminDashboard = () => {
       category: booth.category || '',
       password: booth.password || '',
       logo: booth.logo || '',
-      questions: booth.questions || []
+      questions: booth.questions && booth.questions.length > 0 ? booth.questions : [createEmptyQuestion()]
     });
-    setBoothQuestionsDraft(formatBoothQuestions(booth.questions || []));
     setEditBoothDialog({ open: true, booth });
   };
 
@@ -379,17 +385,32 @@ export const AdminDashboard = () => {
 
   const handleSaveBooth = async () => {
     try {
-      const parsedQuestions = parseBoothQuestions(boothQuestionsDraft);
-      if (parsedQuestions === null) {
+      if (boothForm.questions.length === 0) {
         toast({
-          title: 'Chyba ve formátu otázek',
-          description: 'Zkontrolujte, že otázky jsou validní JSON pole s možnostmi a, b, c a správnou odpovědí.',
+          title: 'Doplňte otázky',
+          description: 'Každý stánek musí mít alespoň jednu otázku.',
           variant: 'destructive'
         });
         return;
       }
 
-      const boothPayload = { ...boothForm, questions: parsedQuestions };
+      const hasInvalidQuestion = boothForm.questions.some(question =>
+        !question.question.trim() ||
+        !question.options.a.trim() ||
+        !question.options.b.trim() ||
+        !question.options.c.trim()
+      );
+
+      if (hasInvalidQuestion) {
+        toast({
+          title: 'Doplňte otázky',
+          description: 'Vyplňte text otázky a všechny možnosti a, b, c.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const boothPayload = { ...boothForm };
       if (editBoothDialog.booth) {
         // Update existing booth in Supabase
         const { error } = await supabase
@@ -435,7 +456,6 @@ export const AdminDashboard = () => {
       setEditBoothDialog({ open: false, booth: null });
       setAddBoothDialog(false);
       setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [] });
-      setBoothQuestionsDraft('');
     } catch (error) {
       console.error('Save booth error:', error);
       toast({ title: 'Chyba při ukládání stánku', description: 'Nastala neočekávaná chyba' });
@@ -1102,8 +1122,7 @@ export const AdminDashboard = () => {
                   Export CSV
                 </Button>
                 <Button onClick={() => {
-                  setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [] });
-                  setBoothQuestionsDraft('');
+                  setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [createEmptyQuestion()] });
                   setAddBoothDialog(true);
                 }}>
                   <Plus className="h-4 w-4 mr-2" />
@@ -2000,7 +2019,6 @@ export const AdminDashboard = () => {
             setEditBoothDialog({ open, booth: null });
             if (!open) {
               setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [] });
-              setBoothQuestionsDraft('');
             }
           }}
         >
@@ -2049,17 +2067,67 @@ export const AdminDashboard = () => {
                 />
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="booth-questions" className="text-right pt-2">Otázky</Label>
-                <div className="col-span-3 space-y-2">
-                  <Textarea
-                    id="booth-questions"
-                    value={boothQuestionsDraft}
-                    onChange={(e) => setBoothQuestionsDraft(e.target.value)}
-                    placeholder='[{"question":"Otázka","options":{"a":"Možnost A","b":"Možnost B","c":"Možnost C"},"correct":"a"}]'
-                    className="min-h-[140px] font-mono text-xs"
-                  />
+                <Label className="text-right pt-2">Otázky</Label>
+                <div className="col-span-3 space-y-4">
+                  {boothForm.questions.map((question, index) => (
+                    <div key={`booth-question-${index}`} className="space-y-3 rounded-lg border border-border p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">Otázka {index + 1}</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeQuestion(index)}
+                          disabled={boothForm.questions.length === 1}
+                        >
+                          Odebrat
+                        </Button>
+                      </div>
+                      <Input
+                        value={question.question}
+                        onChange={(e) => updateQuestion(index, { question: e.target.value })}
+                        placeholder="Text otázky"
+                      />
+                      <div className="grid grid-cols-1 gap-2">
+                        <Input
+                          value={question.options.a}
+                          onChange={(e) => updateQuestionOption(index, 'a', e.target.value)}
+                          placeholder="Možnost A"
+                        />
+                        <Input
+                          value={question.options.b}
+                          onChange={(e) => updateQuestionOption(index, 'b', e.target.value)}
+                          placeholder="Možnost B"
+                        />
+                        <Input
+                          value={question.options.c}
+                          onChange={(e) => updateQuestionOption(index, 'c', e.target.value)}
+                          placeholder="Možnost C"
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Správně</Label>
+                        <Select
+                          value={question.correct}
+                          onValueChange={(value: 'a' | 'b' | 'c') => updateQuestion(index, { correct: value })}
+                        >
+                          <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder="Vyberte odpověď" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="a">a</SelectItem>
+                            <SelectItem value="b">b</SelectItem>
+                            <SelectItem value="c">c</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" onClick={addQuestion}>
+                    Přidat otázku
+                  </Button>
                   <p className="text-xs text-muted-foreground">
-                    Zadejte pole otázek ve formátu JSON. Každá otázka musí mít text, možnosti a, b, c a správnou odpověď.
+                    Účastník musí odpovědět správně na jednu náhodně vybranou otázku.
                   </p>
                 </div>
               </div>
@@ -2079,8 +2147,7 @@ export const AdminDashboard = () => {
           onOpenChange={(open) => {
             setAddBoothDialog(open);
             if (open) {
-              setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [] });
-              setBoothQuestionsDraft('');
+              setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [createEmptyQuestion()] });
             }
           }}
         >
@@ -2129,17 +2196,67 @@ export const AdminDashboard = () => {
                 />
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="add-booth-questions" className="text-right pt-2">Otázky</Label>
-                <div className="col-span-3 space-y-2">
-                  <Textarea
-                    id="add-booth-questions"
-                    value={boothQuestionsDraft}
-                    onChange={(e) => setBoothQuestionsDraft(e.target.value)}
-                    placeholder='[{"question":"Otázka","options":{"a":"Možnost A","b":"Možnost B","c":"Možnost C"},"correct":"a"}]'
-                    className="min-h-[140px] font-mono text-xs"
-                  />
+                <Label className="text-right pt-2">Otázky</Label>
+                <div className="col-span-3 space-y-4">
+                  {boothForm.questions.map((question, index) => (
+                    <div key={`add-booth-question-${index}`} className="space-y-3 rounded-lg border border-border p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">Otázka {index + 1}</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeQuestion(index)}
+                          disabled={boothForm.questions.length === 1}
+                        >
+                          Odebrat
+                        </Button>
+                      </div>
+                      <Input
+                        value={question.question}
+                        onChange={(e) => updateQuestion(index, { question: e.target.value })}
+                        placeholder="Text otázky"
+                      />
+                      <div className="grid grid-cols-1 gap-2">
+                        <Input
+                          value={question.options.a}
+                          onChange={(e) => updateQuestionOption(index, 'a', e.target.value)}
+                          placeholder="Možnost A"
+                        />
+                        <Input
+                          value={question.options.b}
+                          onChange={(e) => updateQuestionOption(index, 'b', e.target.value)}
+                          placeholder="Možnost B"
+                        />
+                        <Input
+                          value={question.options.c}
+                          onChange={(e) => updateQuestionOption(index, 'c', e.target.value)}
+                          placeholder="Možnost C"
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Správně</Label>
+                        <Select
+                          value={question.correct}
+                          onValueChange={(value: 'a' | 'b' | 'c') => updateQuestion(index, { correct: value })}
+                        >
+                          <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder="Vyberte odpověď" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="a">a</SelectItem>
+                            <SelectItem value="b">b</SelectItem>
+                            <SelectItem value="c">c</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" onClick={addQuestion}>
+                    Přidat otázku
+                  </Button>
                   <p className="text-xs text-muted-foreground">
-                    Zadejte pole otázek ve formátu JSON. Každá otázka musí mít text, možnosti a, b, c a správnou odpověď.
+                    Účastník musí odpovědět správně na jednu náhodně vybranou otázku.
                   </p>
                 </div>
               </div>
