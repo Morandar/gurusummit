@@ -27,7 +27,17 @@ interface Winner {
   wonAt: string;
 }
 
-interface Booth {
+export interface BoothQuestion {
+  question: string;
+  options: {
+    a: string;
+    b: string;
+    c: string;
+  };
+  correct: 'a' | 'b' | 'c';
+}
+
+export interface Booth {
   id: number;
   name: string;
   code: string;
@@ -36,6 +46,7 @@ interface Booth {
   category?: string;
   password?: string;
   logo?: string;
+  questions?: BoothQuestion[];
 }
 
 interface ProgramEvent {

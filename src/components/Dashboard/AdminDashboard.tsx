@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { LogOut, Users, Building, Calendar, BarChart3, Download, RotateCcw, Plus, Edit, Trash2, Trophy, User, Image, Eye, Smartphone, Presentation, Coffee, Wrench, Users2, Award, FileText, FileSpreadsheet } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useData, Banner } from '@/context/DataContext';
+import { useData, Banner, BoothQuestion } from '@/context/DataContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -19,7 +19,6 @@ import { LotteryWheel } from './LotteryWheel';
 import { WinnersModal } from './WinnersModal';
 import { ImageUploadModal } from '@/components/Modals/ImageUploadModal';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 
 export const AdminDashboard = () => {
   const { logout } = useAuth();
@@ -48,7 +47,15 @@ export const AdminDashboard = () => {
 
   // Form states
   const [userForm, setUserForm] = useState({ firstName: '', lastName: '', personalNumber: '', position: '' });
-  const [boothForm, setBoothForm] = useState({ name: '', code: '', login: '', category: '', password: '', logo: '' });
+  const [boothForm, setBoothForm] = useState({
+    name: '',
+    code: '',
+    login: '',
+    category: '',
+    password: '',
+    logo: '',
+    questions: [] as BoothQuestion[]
+  });
   const [eventForm, setEventForm] = useState({ time: '', event: '', duration: 30, category: 'lecture' });
   const [phoneForm, setPhoneForm] = useState({
     manufacturerName: '',
@@ -73,6 +80,46 @@ export const AdminDashboard = () => {
   // Local draft state for homepage texts
   const [homePageTextsDraft, setHomePageTextsDraft] = useState(homePageTexts);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  const createEmptyQuestion = (): BoothQuestion => ({
+    question: '',
+    options: { a: '', b: '', c: '' },
+    correct: 'a'
+  });
+
+  const updateQuestion = (index: number, update: Partial<BoothQuestion>) => {
+    setBoothForm(prev => ({
+      ...prev,
+      questions: prev.questions.map((question, idx) =>
+        idx === index ? { ...question, ...update } : question
+      )
+    }));
+  };
+
+  const updateQuestionOption = (index: number, optionKey: 'a' | 'b' | 'c', value: string) => {
+    setBoothForm(prev => ({
+      ...prev,
+      questions: prev.questions.map((question, idx) =>
+        idx === index
+          ? { ...question, options: { ...question.options, [optionKey]: value } }
+          : question
+      )
+    }));
+  };
+
+  const addQuestion = () => {
+    setBoothForm(prev => ({
+      ...prev,
+      questions: [...prev.questions, createEmptyQuestion()]
+    }));
+  };
+
+  const removeQuestion = (index: number) => {
+    setBoothForm(prev => ({
+      ...prev,
+      questions: prev.questions.filter((_, idx) => idx !== index)
+    }));
+  };
 
   // Calculate real-time stats
   const stats = {
@@ -276,7 +323,8 @@ export const AdminDashboard = () => {
       login: booth.login, 
       category: booth.category || '',
       password: booth.password || '',
-      logo: booth.logo || ''
+      logo: booth.logo || '',
+      questions: booth.questions && booth.questions.length > 0 ? booth.questions : [createEmptyQuestion()]
     });
     setEditBoothDialog({ open: true, booth });
   };
@@ -337,17 +385,44 @@ export const AdminDashboard = () => {
 
   const handleSaveBooth = async () => {
     try {
+      if (boothForm.questions.length === 0) {
+        toast({
+          title: 'Doplňte otázky',
+          description: 'Každý stánek musí mít alespoň jednu otázku.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const hasInvalidQuestion = boothForm.questions.some(question =>
+        !question.question.trim() ||
+        !question.options.a.trim() ||
+        !question.options.b.trim() ||
+        !question.options.c.trim()
+      );
+
+      if (hasInvalidQuestion) {
+        toast({
+          title: 'Doplňte otázky',
+          description: 'Vyplňte text otázky a všechny možnosti a, b, c.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const boothPayload = { ...boothForm };
       if (editBoothDialog.booth) {
         // Update existing booth in Supabase
         const { error } = await supabase
           .from('booths')
           .update({
-            name: boothForm.name,
-            code: boothForm.code,
-            login: boothForm.login,
-            category: boothForm.category || null,
-            password: boothForm.password || null,
-            logo: boothForm.logo || null
+            name: boothPayload.name,
+            code: boothPayload.code,
+            login: boothPayload.login,
+            category: boothPayload.category || null,
+            password: boothPayload.password || null,
+            logo: boothPayload.logo || null,
+            questions: boothPayload.questions
           })
           .eq('id', editBoothDialog.booth.id);
 
@@ -359,13 +434,13 @@ export const AdminDashboard = () => {
         // Update local state only if database update succeeded
         setBooths(prev => prev.map(booth => 
           booth.id === editBoothDialog.booth.id 
-            ? { ...booth, ...boothForm }
+            ? { ...booth, ...boothPayload }
             : booth
         ));
         toast({ title: 'Stánek upraven', description: 'Změny byly uloženy' });
       } else {
         // Create new booth
-        const { data, error } = await supabase.from('booths').insert([{ ...boothForm, visits: 0 }]).select();
+        const { data, error } = await supabase.from('booths').insert([{ ...boothPayload, visits: 0 }]).select();
         if (error) {
           toast({ title: 'Chyba při vytváření stánku', description: error.message });
           return;
@@ -373,14 +448,14 @@ export const AdminDashboard = () => {
         
         // Update local state with new booth
         if (data && data[0]) {
-          setBooths(prev => [...prev, { ...boothForm, id: data[0].id, visits: 0 }]);
+          setBooths(prev => [...prev, { ...boothPayload, id: data[0].id, visits: 0 }]);
           toast({ title: 'Stánek přidán', description: 'Nový stánek byl vytvořen' });
         }
       }
       
       setEditBoothDialog({ open: false, booth: null });
       setAddBoothDialog(false);
-      setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '' });
+      setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [] });
     } catch (error) {
       console.error('Save booth error:', error);
       toast({ title: 'Chyba při ukládání stánku', description: 'Nastala neočekávaná chyba' });
@@ -1046,7 +1121,10 @@ export const AdminDashboard = () => {
                   <Download className="h-4 w-4 mr-2" />
                   Export CSV
                 </Button>
-                <Button onClick={() => setAddBoothDialog(true)}>
+                <Button onClick={() => {
+                  setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [createEmptyQuestion()] });
+                  setAddBoothDialog(true);
+                }}>
                   <Plus className="h-4 w-4 mr-2" />
                   Přidat stánek
                 </Button>
@@ -1935,7 +2013,15 @@ export const AdminDashboard = () => {
         </Dialog>
 
         {/* Edit Booth Dialog */}
-        <Dialog open={editBoothDialog.open} onOpenChange={(open) => setEditBoothDialog({ open, booth: null })}>
+        <Dialog
+          open={editBoothDialog.open}
+          onOpenChange={(open) => {
+            setEditBoothDialog({ open, booth: null });
+            if (!open) {
+              setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [] });
+            }
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Upravit stánek</DialogTitle>
@@ -1980,6 +2066,71 @@ export const AdminDashboard = () => {
                   placeholder="Zadejte heslo pro stánek"
                 />
               </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label className="text-right pt-2">Otázky</Label>
+                <div className="col-span-3 space-y-4">
+                  {boothForm.questions.map((question, index) => (
+                    <div key={`booth-question-${index}`} className="space-y-3 rounded-lg border border-border p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">Otázka {index + 1}</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeQuestion(index)}
+                          disabled={boothForm.questions.length === 1}
+                        >
+                          Odebrat
+                        </Button>
+                      </div>
+                      <Input
+                        value={question.question}
+                        onChange={(e) => updateQuestion(index, { question: e.target.value })}
+                        placeholder="Text otázky"
+                      />
+                      <div className="grid grid-cols-1 gap-2">
+                        <Input
+                          value={question.options.a}
+                          onChange={(e) => updateQuestionOption(index, 'a', e.target.value)}
+                          placeholder="Možnost A"
+                        />
+                        <Input
+                          value={question.options.b}
+                          onChange={(e) => updateQuestionOption(index, 'b', e.target.value)}
+                          placeholder="Možnost B"
+                        />
+                        <Input
+                          value={question.options.c}
+                          onChange={(e) => updateQuestionOption(index, 'c', e.target.value)}
+                          placeholder="Možnost C"
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Správně</Label>
+                        <Select
+                          value={question.correct}
+                          onValueChange={(value: 'a' | 'b' | 'c') => updateQuestion(index, { correct: value })}
+                        >
+                          <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder="Vyberte odpověď" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="a">a</SelectItem>
+                            <SelectItem value="b">b</SelectItem>
+                            <SelectItem value="c">c</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" onClick={addQuestion}>
+                    Přidat otázku
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Účastník musí odpovědět správně na jednu náhodně vybranou otázku.
+                  </p>
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditBoothDialog({ open: false, booth: null })}>
@@ -1991,7 +2142,15 @@ export const AdminDashboard = () => {
         </Dialog>
 
         {/* Add Booth Dialog */}
-        <Dialog open={addBoothDialog} onOpenChange={setAddBoothDialog}>
+        <Dialog
+          open={addBoothDialog}
+          onOpenChange={(open) => {
+            setAddBoothDialog(open);
+            if (open) {
+              setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [createEmptyQuestion()] });
+            }
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Přidat stánek</DialogTitle>
@@ -2035,6 +2194,71 @@ export const AdminDashboard = () => {
                   className="col-span-3"
                   placeholder="Zadejte heslo pro stánek"
                 />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label className="text-right pt-2">Otázky</Label>
+                <div className="col-span-3 space-y-4">
+                  {boothForm.questions.map((question, index) => (
+                    <div key={`add-booth-question-${index}`} className="space-y-3 rounded-lg border border-border p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">Otázka {index + 1}</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeQuestion(index)}
+                          disabled={boothForm.questions.length === 1}
+                        >
+                          Odebrat
+                        </Button>
+                      </div>
+                      <Input
+                        value={question.question}
+                        onChange={(e) => updateQuestion(index, { question: e.target.value })}
+                        placeholder="Text otázky"
+                      />
+                      <div className="grid grid-cols-1 gap-2">
+                        <Input
+                          value={question.options.a}
+                          onChange={(e) => updateQuestionOption(index, 'a', e.target.value)}
+                          placeholder="Možnost A"
+                        />
+                        <Input
+                          value={question.options.b}
+                          onChange={(e) => updateQuestionOption(index, 'b', e.target.value)}
+                          placeholder="Možnost B"
+                        />
+                        <Input
+                          value={question.options.c}
+                          onChange={(e) => updateQuestionOption(index, 'c', e.target.value)}
+                          placeholder="Možnost C"
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Správně</Label>
+                        <Select
+                          value={question.correct}
+                          onValueChange={(value: 'a' | 'b' | 'c') => updateQuestion(index, { correct: value })}
+                        >
+                          <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder="Vyberte odpověď" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="a">a</SelectItem>
+                            <SelectItem value="b">b</SelectItem>
+                            <SelectItem value="c">c</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" onClick={addQuestion}>
+                    Přidat otázku
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Účastník musí odpovědět správně na jednu náhodně vybranou otázku.
+                  </p>
+                </div>
               </div>
             </div>
             <DialogFooter>
