@@ -2023,7 +2023,7 @@ export const AdminDashboard = () => {
             }
           }}
         >
-          <DialogContent>
+          <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Upravit stánek</DialogTitle>
               <DialogDescription>Změňte údaje stánku</DialogDescription>
@@ -2152,7 +2152,7 @@ export const AdminDashboard = () => {
             }
           }}
         >
-          <DialogContent>
+          <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Přidat stánek</DialogTitle>
               <DialogDescription>Vytvořte nový stánek</DialogDescription>
