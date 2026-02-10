@@ -1907,7 +1907,7 @@ export const AdminDashboard = () => {
 
         {/* Edit User Dialog */}
         <Dialog open={editUserDialog.open} onOpenChange={(open) => setEditUserDialog({ open, user: null })}>
-          <DialogContent>
+          <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Upravit účastníka</DialogTitle>
               <DialogDescription>Změňte údaje účastníka</DialogDescription>
@@ -1961,7 +1961,7 @@ export const AdminDashboard = () => {
 
         {/* Add User Dialog */}
         <Dialog open={addUserDialog} onOpenChange={setAddUserDialog}>
-          <DialogContent>
+          <DialogContent className="max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Přidat účastníka</DialogTitle>
               <DialogDescription>Vytvořte nového účastníka</DialogDescription>

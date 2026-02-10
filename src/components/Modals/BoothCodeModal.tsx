@@ -23,16 +23,37 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
   const { booths, isCodeEntryAllowed } = useData();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const pickQuestion = (questions: BoothQuestion[]) => {
+    if (questions.length === 0) return null;
+    let randomIndex = 0;
+    if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
+      const buf = new Uint32Array(1);
+      crypto.getRandomValues(buf);
+      randomIndex = buf[0] % questions.length;
+    } else {
+      randomIndex = Math.floor(Math.random() * questions.length);
+    }
+
+    // Avoid repeating the same question on re-open in this browser session when possible.
+    try {
+      const key = `booth-question-last-${boothId}`;
+      const last = sessionStorage.getItem(key);
+      if (last != null && questions.length > 1 && Number(last) === randomIndex) {
+        randomIndex = (randomIndex + 1) % questions.length;
+      }
+      sessionStorage.setItem(key, String(randomIndex));
+    } catch {
+      // sessionStorage not available; ignore
+    }
+
+    return questions[randomIndex];
+  };
+
   useEffect(() => {
     if (!isOpen) return;
     const booth = booths.find(b => b.id === boothId);
     const questions = booth?.questions || [];
-    if (questions.length > 0) {
-      const randomIndex = Math.floor(Math.random() * questions.length);
-      setCurrentQuestion(questions[randomIndex]);
-    } else {
-      setCurrentQuestion(null);
-    }
+    setCurrentQuestion(pickQuestion(questions));
     setSelectedAnswer('');
   }, [booths, boothId, isOpen]);
 
