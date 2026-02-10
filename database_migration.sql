@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS public.visits (
     id BIGSERIAL PRIMARY KEY,
     attendee_id BIGINT REFERENCES public.users(id) ON DELETE CASCADE,
     booth_id BIGINT REFERENCES public.booths(id) ON DELETE CASCADE,
+    answer_correct BOOLEAN,
+    answered_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     UNIQUE(attendee_id, booth_id)
 );

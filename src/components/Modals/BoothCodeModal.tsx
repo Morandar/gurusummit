@@ -10,17 +10,20 @@ import { BoothQuestion, useData } from '@/context/DataContext';
 interface BoothCodeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (boothId: number) => void;
+  onSuccess: (boothId: number, visitResult: 'created' | 'pending' | 'answered' | 'error') => void;
   boothName: string;
   boothId: number;
+  userId: number;
+  visitStatus?: 'pending' | 'correct' | 'wrong';
 }
 
-export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId }: BoothCodeModalProps) => {
+export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId, userId, visitStatus }: BoothCodeModalProps) => {
   const [code, setCode] = useState('');
   const [selectedAnswer, setSelectedAnswer] = useState<'a' | 'b' | 'c' | ''>('');
   const [currentQuestion, setCurrentQuestion] = useState<BoothQuestion | null>(null);
+  const [step, setStep] = useState<'code' | 'question'>('code');
   const { toast } = useToast();
-  const { booths, isCodeEntryAllowed } = useData();
+  const { booths, isCodeEntryAllowed, visitBooth, submitBoothAnswer } = useData();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const pickQuestion = (questions: BoothQuestion[]) => {
@@ -38,6 +41,15 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
 
   useEffect(() => {
     if (!isOpen) return;
+    if (visitStatus === 'correct' || visitStatus === 'wrong') {
+      toast({
+        title: 'Již zodpovězeno',
+        description: 'Tento stánek už máte zodpovězený.',
+        variant: 'destructive'
+      });
+      handleClose();
+      return;
+    }
     const booth = booths.find(b => b.id === boothId);
     const questions = booth?.questions || [];
     const fallbackUser = (window as any).__authUser as { personalNumber?: string; id?: string } | undefined;
@@ -77,7 +89,8 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
 
     setCurrentQuestion(chosen);
     setSelectedAnswer('');
-  }, [booths, boothId, isOpen]);
+    setStep(visitStatus === 'pending' ? 'question' : 'code');
+  }, [booths, boothId, isOpen, visitStatus, toast]);
 
   const validateCode = (inputCode: string) => {
     const booth = booths.find(b => b.id === boothId);
@@ -85,7 +98,7 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
     return inputCode.toUpperCase() === booth.code.toUpperCase();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim()) {
       toast({
@@ -106,6 +119,20 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
     }
 
     if (validateCode(code)) {
+      const result = await visitBooth(userId, boothId);
+      if (result === 'answered') {
+        toast({
+          title: 'Již zodpovězeno',
+          description: 'Tento stánek už máte zodpovězený.',
+          variant: 'destructive'
+        });
+        onSuccess(boothId, result);
+        handleClose();
+        return;
+      }
+      if (result === 'error') {
+        return;
+      }
       if (!currentQuestion) {
         toast({
           title: 'Chybí otázka',
@@ -114,29 +141,20 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
         });
         return;
       }
-      if (!selectedAnswer) {
+      if (result === 'created') {
         toast({
-          title: 'Vyberte odpověď',
-          description: 'Před potvrzením vyberte odpověď na otázku.',
-          variant: 'destructive'
+          title: 'Kód ověřen',
+          description: 'Získali jste 1 bod. Pokračujte na otázku.',
         });
-        return;
-      }
-      if (selectedAnswer !== currentQuestion.correct) {
+      } else {
         toast({
-          title: 'Špatná odpověď',
-          description: 'Zvolená odpověď není správná. Zkuste to znovu.',
-          variant: 'destructive'
+          title: 'Kód ověřen',
+          description: 'Pokračujte na otázku.',
         });
-        setSelectedAnswer('');
-        return;
       }
-      toast({
-        title: 'Úspěch! 🎉',
-        description: `Stánek "${boothName}" byl úspěšně navštíven! Získali jste 10 bodů.`,
-      });
-      onSuccess(boothId);
-      handleClose();
+      onSuccess(boothId, result);
+      setStep('question');
+      return;
     } else {
       toast({
         title: 'Neplatný kód',
@@ -148,10 +166,48 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
     }
   };
 
+  const handleAnswerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentQuestion) {
+      toast({
+        title: 'Chybí otázka',
+        description: 'Tento stánek nemá nastavené otázky. Kontaktujte obsluhu stánku.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    if (!selectedAnswer) {
+      toast({
+        title: 'Vyberte odpověď',
+        description: 'Před potvrzením vyberte odpověď na otázku.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    const isCorrect = selectedAnswer === currentQuestion.correct;
+    const ok = await submitBoothAnswer(userId, boothId, isCorrect);
+    if (!ok) return;
+
+    if (isCorrect) {
+      toast({
+        title: 'Správně! 🎉',
+        description: 'Získali jste 1 bod za správnou odpověď.',
+      });
+    } else {
+      toast({
+        title: 'Špatná odpověď',
+        description: 'Odpověď nebyla správná. Pokus je vyčerpán.',
+        variant: 'destructive'
+      });
+    }
+    handleClose();
+  };
+
   const handleClose = () => {
     setCode('');
     setSelectedAnswer('');
     setCurrentQuestion(null);
+    setStep('code');
     onClose();
   };
 
@@ -169,75 +225,99 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
         </DialogHeader>
 
         <div className="space-y-4 mt-4">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="code">Heslo stánku</Label>
-              <Input
-                ref={inputRef}
-                id="code"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="Zadejte heslo stánku..."
-                maxLength={15}
-                className="text-center text-lg font-mono tracking-wider"
-                autoFocus
-              />
-              <div className="text-xs text-muted-foreground text-center space-y-1">
-                <p>Heslo získáte od pracovníka stánku</p>
-                <p className="text-green-600 font-semibold">✓ Funguje na všech zařízeních</p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <Label>Otázka</Label>
-              {currentQuestion ? (
-                <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-                  <p className="text-sm font-medium text-foreground">{currentQuestion.question}</p>
-                  <div className="space-y-2">
-                    {(['a', 'b', 'c'] as const).map(optionKey => (
-                      <label
-                        key={optionKey}
-                        className="flex items-start gap-2 rounded-md border border-transparent px-2 py-1.5 text-sm transition hover:border-muted-foreground/40"
-                      >
-                        <input
-                          type="radio"
-                          name="booth-question"
-                          value={optionKey}
-                          checked={selectedAnswer === optionKey}
-                          onChange={() => setSelectedAnswer(optionKey)}
-                          className="mt-0.5"
-                        />
-                        <span className="font-semibold uppercase">{optionKey}.</span>
-                        <span>{currentQuestion.options[optionKey]}</span>
-                      </label>
-                    ))}
-                  </div>
+          {step === 'code' ? (
+            <form onSubmit={handleCodeSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="code">Heslo stánku</Label>
+                <Input
+                  ref={inputRef}
+                  id="code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="Zadejte heslo stánku..."
+                  maxLength={15}
+                  className="text-center text-lg font-mono tracking-wider"
+                  autoFocus
+                />
+                <div className="text-xs text-muted-foreground text-center space-y-1">
+                  <p>Heslo získáte od pracovníka stánku</p>
+                  <p className="text-green-600 font-semibold">✓ Funguje na všech zařízeních</p>
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Tento stánek zatím nemá nastavené otázky.
-                </p>
-              )}
-            </div>
+              </div>
 
-            <div className="flex space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
-                className="flex-1"
-              >
-                <X className="h-4 w-4 mr-2" />
-                Zrušit
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1 bg-secondary hover:bg-secondary-hover"
-                disabled={!code.trim() || !currentQuestion || !selectedAnswer}
-              >
-                Potvrdit
-              </Button>
-            </div>
-          </form>
+              <div className="flex space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  className="flex-1"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Zrušit
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1 bg-secondary hover:bg-secondary-hover"
+                  disabled={!code.trim()}
+                >
+                  Pokračovat
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleAnswerSubmit} className="space-y-4">
+              <div className="space-y-3">
+                <Label>Otázka</Label>
+                {currentQuestion ? (
+                  <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+                    <p className="text-sm font-medium text-foreground">{currentQuestion.question}</p>
+                    <div className="space-y-2">
+                      {(['a', 'b', 'c'] as const).map(optionKey => (
+                        <label
+                          key={optionKey}
+                          className="flex items-start gap-2 rounded-md border border-transparent px-2 py-1.5 text-sm transition hover:border-muted-foreground/40"
+                        >
+                          <input
+                            type="radio"
+                            name="booth-question"
+                            value={optionKey}
+                            checked={selectedAnswer === optionKey}
+                            onChange={() => setSelectedAnswer(optionKey)}
+                            className="mt-0.5"
+                          />
+                          <span className="font-semibold uppercase">{optionKey}.</span>
+                          <span>{currentQuestion.options[optionKey]}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Tento stánek zatím nemá nastavené otázky.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  className="flex-1"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Zrušit
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1 bg-secondary hover:bg-secondary-hover"
+                  disabled={!currentQuestion || !selectedAnswer}
+                >
+                  Potvrdit odpověď
+                </Button>
+              </div>
+            </form>
+          )}
         </div>
       </DialogContent>
     </Dialog>

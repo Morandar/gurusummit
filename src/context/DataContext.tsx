@@ -12,6 +12,7 @@ interface User {
   visits: number;
   progress: number;
   visitedBooths: number[];
+  boothAnswers?: Record<number, 'pending' | 'correct' | 'wrong'>;
   profileImage?: string;
   password_hash?: string;
 }
@@ -133,7 +134,8 @@ interface DataContextType {
   setDiscountedPhones: React.Dispatch<React.SetStateAction<DiscountedPhone[]>>;
   setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
   setBanner: React.Dispatch<React.SetStateAction<Banner | null>>;
-  visitBooth: (userId: number, boothId: number) => Promise<void>;
+  visitBooth: (userId: number, boothId: number) => Promise<'created' | 'pending' | 'answered' | 'error'>;
+  submitBoothAnswer: (userId: number, boothId: number, isCorrect: boolean) => Promise<boolean>;
   getUserProgress: (userId: number) => number;
   resetAllProgress: () => void;
   isCodeEntryAllowed: () => boolean;
@@ -280,6 +282,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           visits: 0,
           progress: 0,
           visitedBooths: [],
+          boothAnswers: {},
         }
       ]);
       toast({ title: 'Uživatel přidán', description: 'Nový účastník byl vytvořen.' });
@@ -333,6 +336,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           visits: 0,
           progress: 0,
           visitedBooths: [],
+          boothAnswers: {},
         }
       ]);
       toast({ title: 'Registrace úspěšná', description: 'Můžete se přihlásit.' });
@@ -364,6 +368,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       visits: data.visits || 0,
       progress: data.progress || 0,
       visitedBooths: data.visitedbooths || [],
+      boothAnswers: {},
       profileImage: data.profileimage,
       password_hash: data.password_hash
     };
@@ -436,9 +441,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       console.log(`👥 DataContext: Fetched ${usersData.length} users from database`);
       console.log('👥 DataContext: Sample user data:', usersData[0]); // Debug first user
 
-      const { data: visitsData, error: visitsError } = await fetchAllVisitRows('attendee_id, booth_id');
+      const { data: visitsData, error: visitsError } = await fetchAllVisitRows('attendee_id, booth_id, answer_correct');
 
       const visitsByUser: Map<number, Set<number>> = new Map();
+      const answersByUser: Map<number, Record<number, 'pending' | 'correct' | 'wrong'>> = new Map();
 
       if (!visitsError && visitsData.length > 0) {
         visitsData.forEach((visit: any) => {
@@ -447,6 +453,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             visitsByUser.set(visit.attendee_id, new Set<number>());
           }
           visitsByUser.get(visit.attendee_id)!.add(visit.booth_id);
+
+          if (!answersByUser.has(visit.attendee_id)) {
+            answersByUser.set(visit.attendee_id, {});
+          }
+          const status =
+            visit.answer_correct === true
+              ? 'correct'
+              : visit.answer_correct === false
+                ? 'wrong'
+                : 'pending';
+          answersByUser.get(visit.attendee_id)![visit.booth_id] = status;
         });
         console.log(`👥 DataContext: Processed ${visitsData.length} visit rows into unique booth counts`);
       } else if (visitsError) {
@@ -469,6 +486,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           visits: visitCount,
           progress: calculateProgress(visitCount, boothCount),
           visitedBooths: visitedBooths, // Unique booth IDs visited by the user
+          boothAnswers: answersByUser.get(user.id) || {},
           profileImage: user.profileimage,
           password_hash: user.password_hash
         };
@@ -838,7 +856,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const visitBooth = async (userId: number, boothId: number) => {
+  const visitBooth = async (userId: number, boothId: number): Promise<'created' | 'pending' | 'answered' | 'error'> => {
     console.log(`🏪 DataContext: visitBooth called - userId: ${userId}, boothId: ${boothId}`);
 
     const targetBooth = booths.find(b => b.id === boothId);
@@ -847,15 +865,23 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     if (!targetUser) {
       console.error('❌ DataContext: User not found for visitBooth');
       toast({ title: 'Uživatel nenalezen', description: 'Zkuste akci zopakovat.' });
-      return;
+      return 'error';
     }
     if (!targetBooth) {
       console.error('❌ DataContext: Booth not found for visitBooth');
       toast({ title: 'Stánek nenalezen', description: 'Zkuste akci zopakovat.' });
-      return;
+      return 'error';
     }
 
     try {
+      const existingStatus = targetUser.boothAnswers?.[boothId];
+      if (existingStatus === 'correct' || existingStatus === 'wrong') {
+        return 'answered';
+      }
+      if (existingStatus === 'pending') {
+        return 'pending';
+      }
+
       console.log('💾 DataContext: Inserting visit into database...');
       // Try to insert new visit into database
       // If it already exists, the unique constraint will be violated
@@ -864,20 +890,30 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         .insert([{
           booth_id: boothId,
           attendee_id: userId,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          answer_correct: null,
+          answered_at: null
         }]);
 
       if (insertError) {
         // Check if it's a unique constraint violation (user already visited this booth)
         if (insertError.code === '23505') { // PostgreSQL unique constraint violation
           console.log('⚠️ DataContext: User already visited this booth');
-          toast({ title: 'Již navštíveno', description: 'Tento stánek jste již navštívili.' });
-          return;
+          const { data: existingVisit } = await supabase
+            .from('visits')
+            .select('answer_correct')
+            .eq('attendee_id', userId)
+            .eq('booth_id', boothId)
+            .maybeSingle();
+          if (existingVisit?.answer_correct === true || existingVisit?.answer_correct === false) {
+            return 'answered';
+          }
+          return 'pending';
         }
 
         console.error('❌ DataContext: Error inserting visit:', insertError);
         toast({ title: 'Chyba při ukládání návštěvy', description: insertError.message });
-        return;
+        return 'error';
       }
 
       console.log('✅ DataContext: Visit inserted successfully, updating local state...');
@@ -901,7 +937,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             ...user,
             visitedBooths: newVisitedBooths,
             visits: user.visits + 1,
-            progress: newProgress
+            progress: newProgress,
+            boothAnswers: {
+              ...(user.boothAnswers || {}),
+              [boothId]: 'pending'
+            }
           };
           console.log('👤 DataContext: Updated user:', updatedUser);
           return updatedUser;
@@ -931,10 +971,48 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       });
 
       console.log('✅ DataContext: Booth visit completed successfully');
-      toast({ title: 'Stánek navštíven!', description: 'Váš pokrok byl aktualizován.' });
+      return 'created';
     } catch (error) {
       console.error('❌ DataContext: Visit booth error:', error);
       toast({ title: 'Chyba při návštěvě stánku', description: 'Nastala neočekávaná chyba.' });
+      return 'error';
+    }
+  };
+
+  const submitBoothAnswer = async (userId: number, boothId: number, isCorrect: boolean): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('visits')
+        .update({
+          answer_correct: isCorrect,
+          answered_at: new Date().toISOString()
+        })
+        .eq('attendee_id', userId)
+        .eq('booth_id', boothId);
+
+      if (error) {
+        toast({ title: 'Chyba při ukládání odpovědi', description: error.message });
+        return false;
+      }
+
+      setUsersState(prevUsers =>
+        prevUsers.map(user => {
+          if (user.id !== userId) return user;
+          return {
+            ...user,
+            boothAnswers: {
+              ...(user.boothAnswers || {}),
+              [boothId]: isCorrect ? 'correct' : 'wrong'
+            }
+          };
+        })
+      );
+
+      return true;
+    } catch (error) {
+      console.error('Submit booth answer error:', error);
+      toast({ title: 'Chyba při ukládání odpovědi', description: 'Nastala neočekávaná chyba.' });
+      return false;
     }
   };
 
@@ -963,7 +1041,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           ...user,
           visits: 0,
           progress: 0,
-          visitedBooths: []
+          visitedBooths: [],
+          boothAnswers: {}
         }))
       );
 
@@ -1336,6 +1415,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       setNotifications,
       setBanner,
       visitBooth,
+      submitBoothAnswer,
       getUserProgress,
       resetAllProgress,
       isCodeEntryAllowed,

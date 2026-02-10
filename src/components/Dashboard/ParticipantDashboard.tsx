@@ -20,7 +20,7 @@ interface ParticipantDashboardProps {
 }
 
 export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: ParticipantDashboardProps) => {
-  const { booths, program, users, visitBooth, isLoading, discountedPhones, banners, banner, lotterySettings } = useData();
+  const { booths, program, users, isLoading, discountedPhones, banners, banner, lotterySettings } = useData();
   const [timeToNext, setTimeToNext] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [selectedBooth, setSelectedBooth] = useState<{ id: number; name: string } | null>(null);
@@ -141,16 +141,15 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
 
 
   const handleBoothVisit = (boothId: number, boothName: string) => {
-    if (!visitedBooths.includes(boothId)) {
+    const status = currentUser?.boothAnswers?.[boothId];
+    if (status !== 'correct' && status !== 'wrong') {
       setSelectedBooth({ id: boothId, name: boothName });
     }
   };
 
-  const handleBoothSuccess = async (boothId: number) => {
-    if (currentUser) {
-      await visitBooth(currentUser.id, boothId);
-      
-      // Check if user completed all booths
+  const handleBoothSuccess = async (boothId: number, visitResult: 'created' | 'pending' | 'answered' | 'error') => {
+    if (!currentUser) return;
+    if (visitResult === 'created') {
       const newVisitedBooths = [...visitedBooths, boothId];
       if (newVisitedBooths.length === booths.length && booths.length > 0) {
         setTimeout(() => {
@@ -158,7 +157,6 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
         }, 500);
       }
     }
-    setSelectedBooth(null);
   };
 
   const handleCloseModal = () => {
@@ -368,6 +366,7 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                 <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   {booths.map((booth) => {
                     const isVisited = visitedBooths.includes(booth.id);
+                    const status = currentUser?.boothAnswers?.[booth.id];
                     return (
                       <Card
                         key={booth.id}
@@ -395,9 +394,17 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                               <div className="flex items-start justify-between">
                                 <h3 className="font-medium text-sm sm:text-base leading-tight truncate">{booth.name}</h3>
                                 <div className="flex-shrink-0 ml-2">
-                                  {isVisited ? (
+                                  {status === 'correct' ? (
                                     <Badge variant="secondary" className="text-xs">
                                       ✓ OK
+                                    </Badge>
+                                  ) : status === 'wrong' ? (
+                                    <Badge variant="destructive" className="text-xs">
+                                      ✕ FAIL
+                                    </Badge>
+                                  ) : isVisited ? (
+                                    <Badge variant="outline" className="text-xs">
+                                      Čeká
                                     </Badge>
                                   ) : (
                                     <Lock className="h-4 w-4 text-muted-foreground" />
@@ -578,13 +585,17 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
     </div>
     
     {/* Booth Code Modal */}
-    <BoothCodeModal
-      isOpen={selectedBooth !== null}
-      onClose={handleCloseModal}
-      onSuccess={handleBoothSuccess}
-      boothName={selectedBooth?.name || ''}
-      boothId={selectedBooth?.id || 0}
-    />
+    {selectedBooth && currentUser && (
+      <BoothCodeModal
+        isOpen={selectedBooth !== null}
+        onClose={handleCloseModal}
+        onSuccess={handleBoothSuccess}
+        boothName={selectedBooth?.name || ''}
+        boothId={selectedBooth?.id || 0}
+        userId={currentUser.id}
+        visitStatus={currentUser.boothAnswers?.[selectedBooth.id]}
+      />
+    )}
   </>
   );
 };
