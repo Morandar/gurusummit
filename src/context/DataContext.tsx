@@ -975,6 +975,21 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         }))
       );
 
+      // Clear per-booth question assignments so users get new questions after reset
+      try {
+        const prefix = 'booth-question-';
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith(prefix)) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+      } catch {
+        // localStorage unavailable; ignore
+      }
+
       toast({ title: 'Pokrok resetován', description: 'Všechny návštěvy byly smazány' });
     } catch (error) {
       console.error('Reset progress error:', error);

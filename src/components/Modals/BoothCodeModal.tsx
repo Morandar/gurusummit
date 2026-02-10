@@ -33,19 +33,6 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
     } else {
       randomIndex = Math.floor(Math.random() * questions.length);
     }
-
-    // Avoid repeating the same question on re-open in this browser session when possible.
-    try {
-      const key = `booth-question-last-${boothId}`;
-      const last = sessionStorage.getItem(key);
-      if (last != null && questions.length > 1 && Number(last) === randomIndex) {
-        randomIndex = (randomIndex + 1) % questions.length;
-      }
-      sessionStorage.setItem(key, String(randomIndex));
-    } catch {
-      // sessionStorage not available; ignore
-    }
-
     return questions[randomIndex];
   };
 
@@ -53,7 +40,42 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId 
     if (!isOpen) return;
     const booth = booths.find(b => b.id === boothId);
     const questions = booth?.questions || [];
-    setCurrentQuestion(pickQuestion(questions));
+    const fallbackUser = (window as any).__authUser as { personalNumber?: string; id?: string } | undefined;
+    const userKey = fallbackUser?.personalNumber || fallbackUser?.id || 'anonymous';
+    const storageKey = `booth-question-${userKey}-${boothId}`;
+    let chosen: BoothQuestion | null = null;
+
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored) as { question: BoothQuestion };
+        const match = questions.find(q =>
+          q.question === parsed.question?.question &&
+          q.options?.a === parsed.question?.options?.a &&
+          q.options?.b === parsed.question?.options?.b &&
+          q.options?.c === parsed.question?.options?.c &&
+          q.correct === parsed.question?.correct
+        );
+        if (match) {
+          chosen = match;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+
+    if (!chosen) {
+      chosen = pickQuestion(questions);
+      if (chosen) {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify({ question: chosen }));
+        } catch {
+          // ignore storage errors
+        }
+      }
+    }
+
+    setCurrentQuestion(chosen);
     setSelectedAnswer('');
   }, [booths, boothId, isOpen]);
 
