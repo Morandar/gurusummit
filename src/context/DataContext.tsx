@@ -1085,6 +1085,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         console.warn('Could not delete visits from database, but continuing with local state reset');
       }
 
+      const { error: votesError } = await supabase
+        .from('final_votes')
+        .delete()
+        .neq('id', 0);
+      if (votesError) {
+        console.error('Error resetting final votes:', votesError);
+      }
+
       // Update local state - clear all user progress
       setUsers(prevUsers =>
         prevUsers.map(user => ({

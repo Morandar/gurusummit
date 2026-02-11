@@ -121,7 +121,7 @@ export const AdminDashboard = () => {
       setFinalVoteAverages(averages);
     };
     fetchFinalVotes();
-  }, []);
+  }, [finalSettings?.enabled]);
 
   
   // Local draft state for homepage texts
@@ -398,10 +398,14 @@ export const AdminDashboard = () => {
   }, [users, evaluationRows, evaluationKeyField, evaluationTieField]);
 
   const evaluationOptions = useMemo(() => {
-    return evaluationData.rows.map(row => ({
-      value: String(row.user.personalNumber),
-      label: `${row.user.firstName} ${row.user.lastName} (${row.user.personalNumber})`
-    }));
+    return evaluationData.rows
+      .map(row => ({
+        value: String(row.user.personalNumber),
+        label: `${row.user.firstName} ${row.user.lastName} (${row.user.personalNumber})`,
+        sortKey: `${row.user.lastName || ''} ${row.user.firstName || ''}`.trim().toLowerCase()
+      }))
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .map(({ value, label }) => ({ value, label }));
   }, [evaluationData.rows]);
 
   const handleApplyAutoTop10 = () => {
@@ -427,6 +431,30 @@ export const AdminDashboard = () => {
       top10PersonalNumbers: cleaned
     });
     toast({ title: 'Nastavení uloženo', description: 'Finále TOP10 bylo aktualizováno.' });
+  };
+
+  const handleRefreshFinalAverages = async () => {
+    const { data, error } = await supabase.from('final_votes').select('scores');
+    if (error) {
+      toast({ title: 'Chyba načtení průměrů', description: error.message });
+      return;
+    }
+    const totals: Record<string, { sum: number; count: number }> = {};
+    (data || []).forEach((row: any) => {
+      const scores = row?.scores || {};
+      Object.entries(scores).forEach(([personalNumber, rankValue]) => {
+        const rank = Number(rankValue);
+        if (!Number.isFinite(rank)) return;
+        if (!totals[personalNumber]) totals[personalNumber] = { sum: 0, count: 0 };
+        totals[personalNumber].sum += rank;
+        totals[personalNumber].count += 1;
+      });
+    });
+    const averages: Record<string, number> = {};
+    Object.entries(totals).forEach(([personalNumber, data]) => {
+      averages[personalNumber] = data.count > 0 ? Number((data.sum / data.count).toFixed(2)) : 0;
+    });
+    setFinalVoteAverages(averages);
   };
 
   const handleResetProgress = () => {
@@ -1388,6 +1416,9 @@ export const AdminDashboard = () => {
                       <Button type="button" variant="outline" onClick={handleApplyAutoTop10}>
                         Načíst z vyhodnocení
                       </Button>
+                      <Button type="button" variant="outline" onClick={handleRefreshFinalAverages}>
+                        Načíst průměry
+                      </Button>
                     </div>
 
                     {useManualTop10 && (
@@ -1440,18 +1471,27 @@ export const AdminDashboard = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            {evaluationData.top10.map(row => (
-                              <tr key={row.user.id} className="border-b">
-                                <td className="p-3">{row.rank}</td>
-                                <td className="p-3">{row.user.firstName} {row.user.lastName}</td>
-                                <td className="p-3">{row.points}</td>
-                                <td className="p-3">{row.correct}</td>
-                                <td className="p-3">{row.wrong}</td>
-                                <td className="p-3">
-                                  {finalVoteAverages[String(row.user.personalNumber)] ?? '-'}
-                                </td>
-                              </tr>
-                            ))}
+                            {evaluationData.top10
+                              .map(row => ({
+                                ...row,
+                                averageRank: finalVoteAverages[String(row.user.personalNumber)]
+                              }))
+                              .sort((a, b) => {
+                                const aVal = a.averageRank ?? Number.POSITIVE_INFINITY;
+                                const bVal = b.averageRank ?? Number.POSITIVE_INFINITY;
+                                if (aVal !== bVal) return aVal - bVal;
+                                return a.rank - b.rank;
+                              })
+                              .map((row, index) => (
+                                <tr key={row.user.id} className="border-b">
+                                  <td className="p-3">{index + 1}</td>
+                                  <td className="p-3">{row.user.firstName} {row.user.lastName}</td>
+                                  <td className="p-3">{row.points}</td>
+                                  <td className="p-3">{row.correct}</td>
+                                  <td className="p-3">{row.wrong}</td>
+                                  <td className="p-3">{row.averageRank ?? '-'}</td>
+                                </tr>
+                              ))}
                           </tbody>
                         </table>
                       </div>

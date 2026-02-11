@@ -41,6 +41,11 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
       .filter(Boolean) as any[];
   }, [finalSettings, users]);
 
+  const isFinalist = useMemo(() => {
+    if (!currentUser) return false;
+    return finalTop10Users.some(u => String(u.personalNumber) === String(currentUser.personalNumber));
+  }, [finalTop10Users, currentUser]);
+
   useEffect(() => {
     const loadFinalVote = async () => {
       if (!finalSettings?.enabled || !currentUser) return;
@@ -652,6 +657,8 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                 <CardContent className="space-y-4">
                   {finalTop10Users.length === 0 ? (
                     <p className="text-sm text-muted-foreground">TOP10 zatím není nastaveno.</p>
+                  ) : isFinalist ? (
+                    <p className="text-sm text-muted-foreground">Účastníci TOP10 nemohou hlasovat.</p>
                   ) : (
                     <div className="space-y-3">
                       {finalTop10Users.map((u, idx) => (
@@ -685,7 +692,7 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                   <div className="flex justify-end">
                     <Button
                       onClick={handleSubmitFinalVotes}
-                      disabled={finalVoteSubmitted || finalVoteLoading || finalTop10Users.length !== 10}
+                      disabled={finalVoteSubmitted || finalVoteLoading || finalTop10Users.length !== 10 || isFinalist}
                     >
                       {finalVoteSubmitted ? 'Hlas odeslán' : finalVoteLoading ? 'Odesílám…' : 'Odeslat hodnocení'}
                     </Button>
