@@ -85,6 +85,7 @@ export const AdminDashboard = () => {
   const [finalEnabled, setFinalEnabled] = useState(false);
   const [useManualTop10, setUseManualTop10] = useState(false);
   const [manualTop10, setManualTop10] = useState<string[]>(Array.from({ length: 10 }, () => ''));
+  const [finalVoteAverages, setFinalVoteAverages] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setFinalEnabled(finalSettings?.enabled || false);
@@ -94,6 +95,33 @@ export const AdminDashboard = () => {
       setManualTop10(next);
     }
   }, [finalSettings]);
+
+  useEffect(() => {
+    const fetchFinalVotes = async () => {
+      const { data, error } = await supabase.from('final_votes').select('scores');
+      if (error) {
+        console.error('Error fetching final votes:', error);
+        return;
+      }
+      const totals: Record<string, { sum: number; count: number }> = {};
+      (data || []).forEach((row: any) => {
+        const scores = row?.scores || {};
+        Object.entries(scores).forEach(([personalNumber, rankValue]) => {
+          const rank = Number(rankValue);
+          if (!Number.isFinite(rank)) return;
+          if (!totals[personalNumber]) totals[personalNumber] = { sum: 0, count: 0 };
+          totals[personalNumber].sum += rank;
+          totals[personalNumber].count += 1;
+        });
+      });
+      const averages: Record<string, number> = {};
+      Object.entries(totals).forEach(([personalNumber, data]) => {
+        averages[personalNumber] = data.count > 0 ? Number((data.sum / data.count).toFixed(2)) : 0;
+      });
+      setFinalVoteAverages(averages);
+    };
+    fetchFinalVotes();
+  }, []);
 
   
   // Local draft state for homepage texts
@@ -1408,6 +1436,7 @@ export const AdminDashboard = () => {
                               <th className="text-left p-3">Body</th>
                               <th className="text-left p-3">Správně</th>
                               <th className="text-left p-3">Špatně</th>
+                              <th className="text-left p-3">Průměr pořadí</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1418,6 +1447,9 @@ export const AdminDashboard = () => {
                                 <td className="p-3">{row.points}</td>
                                 <td className="p-3">{row.correct}</td>
                                 <td className="p-3">{row.wrong}</td>
+                                <td className="p-3">
+                                  {finalVoteAverages[String(row.user.personalNumber)] ?? '-'}
+                                </td>
                               </tr>
                             ))}
                           </tbody>

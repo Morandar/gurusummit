@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { BoothCodeModal } from '@/components/Modals/BoothCodeModal';
@@ -66,11 +65,18 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
     loadFinalVote();
   }, [finalSettings, currentUser]);
 
-  const handleFinalScoreChange = (personalNumber: string, value: string) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return;
-    const clamped = Math.max(0, Math.min(10, numeric));
-    setFinalScores(prev => ({ ...prev, [personalNumber]: clamped }));
+  const handleFinalRankSelect = (personalNumber: string, rank: number) => {
+    setFinalScores(prev => {
+      const next = { ...prev };
+      // Ensure rank is unique: remove it from anyone else
+      Object.keys(next).forEach(key => {
+        if (next[key] === rank) {
+          delete next[key];
+        }
+      });
+      next[personalNumber] = rank;
+      return next;
+    });
   };
 
   const handleSubmitFinalVotes = async () => {
@@ -78,7 +84,12 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
     if (finalVoteSubmitted) return;
     const missing = finalTop10Users.filter(u => finalScores[String(u.personalNumber)] == null);
     if (missing.length > 0) {
-      alert('Vyplňte hodnocení pro všech 10 účastníků.');
+      alert('Vyplňte pořadí pro všech 10 účastníků (1–10).');
+      return;
+    }
+    const usedRanks = new Set(Object.values(finalScores));
+    if (usedRanks.size !== 10) {
+      alert('Každé pořadí 1–10 lze použít jen jednou.');
       return;
     }
     setFinalVoteLoading(true);
@@ -635,7 +646,7 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                     Finále TOP10
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Ohodnoťte všech 10 účastníků čísly 0–10. Odeslat lze až po vyplnění všech hodnocení.
+                    Seřaďte TOP10 podle vašeho pořadí (1 = nejlepší, 10 = nejhorší). Každé číslo lze použít jen jednou.
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -644,22 +655,29 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                   ) : (
                     <div className="space-y-3">
                       {finalTop10Users.map((u, idx) => (
-                        <div key={`final-${u.id}`} className="flex items-center gap-3 border rounded-md p-3">
+                        <div key={`final-${u.id}`} className="flex flex-col sm:flex-row sm:items-center gap-3 border rounded-md p-3">
                           <div className="w-6 text-sm text-muted-foreground">{idx + 1}.</div>
                           <div className="flex-1">
                             <div className="font-medium text-sm sm:text-base">{u.firstName} {u.lastName}</div>
                             <div className="text-xs text-muted-foreground">{u.personalNumber}</div>
                           </div>
-                          <Input
-                            type="number"
-                            min={0}
-                            max={10}
-                            step={1}
-                            disabled={finalVoteSubmitted}
-                            value={finalScores[String(u.personalNumber)] ?? ''}
-                            onChange={(e) => handleFinalScoreChange(String(u.personalNumber), e.target.value)}
-                            className="w-20 text-center"
-                          />
+                          <div className="flex flex-wrap gap-2">
+                            {Array.from({ length: 10 }, (_, i) => i + 1).map(rank => {
+                              const selected = finalScores[String(u.personalNumber)] === rank;
+                              return (
+                                <Button
+                                  key={`${u.personalNumber}-${rank}`}
+                                  type="button"
+                                  variant={selected ? 'default' : 'outline'}
+                                  size="sm"
+                                  disabled={finalVoteSubmitted}
+                                  onClick={() => handleFinalRankSelect(String(u.personalNumber), rank)}
+                                >
+                                  {rank}
+                                </Button>
+                              );
+                            })}
+                          </div>
                         </div>
                       ))}
                     </div>
