@@ -81,6 +81,12 @@ interface LotterySettings {
   minimumPercentage: number; // Minimum percentage of booths to visit for lottery eligibility
 }
 
+interface FinalSettings {
+  enabled: boolean;
+  top10PersonalNumbers: string[];
+  manual: boolean;
+}
+
 interface DiscountedPhone {
   id: number;
   manufacturerName: string;
@@ -119,6 +125,7 @@ interface DataContextType {
   codeTimeSettings: CodeTimeSettings;
   homePageTexts: HomePageTexts;
   lotterySettings: LotterySettings;
+  finalSettings: FinalSettings;
   winners: Winner[];
   discountedPhones: DiscountedPhone[];
   notifications: Notification[];
@@ -131,6 +138,7 @@ interface DataContextType {
   setCodeTimeSettings: React.Dispatch<React.SetStateAction<CodeTimeSettings>>;
   setHomePageTexts: React.Dispatch<React.SetStateAction<HomePageTexts>>;
   setLotterySettings: React.Dispatch<React.SetStateAction<LotterySettings>>;
+  setFinalSettings: React.Dispatch<React.SetStateAction<FinalSettings>>;
   setWinners: React.Dispatch<React.SetStateAction<Winner[]>>;
   setDiscountedPhones: React.Dispatch<React.SetStateAction<DiscountedPhone[]>>;
   setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
@@ -194,6 +202,12 @@ const initialHomePageTexts: HomePageTexts = {
 
 const initialLotterySettings: LotterySettings = {
   minimumPercentage: 100 // Default to 100% (all booths required)
+};
+
+const initialFinalSettings: FinalSettings = {
+  enabled: false,
+  top10PersonalNumbers: [],
+  manual: false
 };
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
@@ -297,6 +311,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [codeTimeSettings, setCodeTimeSettingsState] = useState<CodeTimeSettings>(initialCodeTimeSettings);
   const [homePageTexts, setHomePageTextsState] = useState<HomePageTexts>(initialHomePageTexts);
   const [lotterySettings, setLotterySettingsState] = useState<LotterySettings>(initialLotterySettings);
+  const [finalSettings, setFinalSettingsState] = useState<FinalSettings>(initialFinalSettings);
   const [winners, setWinnersState] = useState<Winner[]>([]);
   const [discountedPhones, setDiscountedPhones] = useState<DiscountedPhone[]>(initialDiscountedPhones);
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
@@ -417,6 +432,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setLotterySettingsState(prev => {
       const next = typeof updater === 'function' ? (updater as any)(prev) : updater;
       supabase.from('settings').upsert([{ key: 'lotterySettings', value: JSON.stringify(next) }]).then();
+      return next;
+    });
+  };
+
+  const setFinalSettings = async (updater: React.SetStateAction<FinalSettings>) => {
+    setFinalSettingsState(prev => {
+      const next = typeof updater === 'function' ? (updater as any)(prev) : updater;
+      supabase.from('settings').upsert([{ key: 'finalSettings', value: JSON.stringify(next) }]).then();
       return next;
     });
   };
@@ -788,6 +811,18 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (!lotteryError && lotteryData?.value) {
         const parsedLottery = JSON.parse(lotteryData.value);
         setLotterySettingsState(parsedLottery);
+      }
+
+      // Fetch final settings
+      const { data: finalData, error: finalError } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'finalSettings')
+        .single();
+
+      if (!finalError && finalData?.value) {
+        const parsedFinal = JSON.parse(finalData.value);
+        setFinalSettingsState(parsedFinal);
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -1414,6 +1449,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       codeTimeSettings,
       homePageTexts,
       lotterySettings,
+      finalSettings,
       winners,
       discountedPhones,
       notifications,
@@ -1426,6 +1462,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       setCodeTimeSettings,
       setHomePageTexts,
       setLotterySettings,
+      setFinalSettings,
       setWinners,
       setDiscountedPhones,
       setNotifications,

@@ -24,9 +24,9 @@ import { Switch } from '@/components/ui/switch';
 export const AdminDashboard = () => {
   const { logout } = useAuth();
   const {
-    users, booths, program, codeTimeSettings, homePageTexts, lotterySettings, winners, discountedPhones, banners, banner,
+    users, booths, program, codeTimeSettings, homePageTexts, lotterySettings, finalSettings, winners, discountedPhones, banners, banner,
     setUsers, setBooths, setProgram, setCodeTimeSettings, setHomePageTexts, setLotterySettings, setDiscountedPhones, setBanner,
-    resetAllProgress, removeUserProfileImage, addUserByAdmin, updateBanner, fetchAllBanners
+    resetAllProgress, removeUserProfileImage, addUserByAdmin, updateBanner, fetchAllBanners, setFinalSettings
   } = useData();
 
   const isLoading = false; // Temporary fix for TS cache issue
@@ -82,6 +82,18 @@ export const AdminDashboard = () => {
   const [evaluationHeaders, setEvaluationHeaders] = useState<string[]>([]);
   const [evaluationKeyField, setEvaluationKeyField] = useState<string>('');
   const [evaluationTieField, setEvaluationTieField] = useState<string>('');
+  const [finalEnabled, setFinalEnabled] = useState(false);
+  const [useManualTop10, setUseManualTop10] = useState(false);
+  const [manualTop10, setManualTop10] = useState<string[]>(Array.from({ length: 10 }, () => ''));
+
+  useEffect(() => {
+    setFinalEnabled(finalSettings?.enabled || false);
+    setUseManualTop10(finalSettings?.manual || false);
+    if (finalSettings?.top10PersonalNumbers?.length) {
+      const next = Array.from({ length: 10 }, (_, i) => finalSettings.top10PersonalNumbers[i] || '');
+      setManualTop10(next);
+    }
+  }, [finalSettings]);
 
   
   // Local draft state for homepage texts
@@ -356,6 +368,38 @@ export const AdminDashboard = () => {
       matchedCount
     };
   }, [users, evaluationRows, evaluationKeyField, evaluationTieField]);
+
+  const evaluationOptions = useMemo(() => {
+    return evaluationData.rows.map(row => ({
+      value: String(row.user.personalNumber),
+      label: `${row.user.firstName} ${row.user.lastName} (${row.user.personalNumber})`
+    }));
+  }, [evaluationData.rows]);
+
+  const handleApplyAutoTop10 = () => {
+    const next = Array.from({ length: 10 }, (_, i) => evaluationData.top10[i]?.user.personalNumber || '');
+    setManualTop10(next);
+  };
+
+  const handleSaveFinalSettings = async () => {
+    const selected = useManualTop10 ? manualTop10 : evaluationData.top10.map(row => String(row.user.personalNumber));
+    const cleaned = selected.filter(Boolean);
+    if (finalEnabled && cleaned.length !== 10) {
+      toast({ title: 'Vyberte 10 účastníků', description: 'Pro finále musí být vybráno přesně 10 účastníků.' });
+      return;
+    }
+    const uniqueCount = new Set(cleaned).size;
+    if (finalEnabled && uniqueCount !== cleaned.length) {
+      toast({ title: 'Duplicitní účastníci', description: 'Každý účastník musí být v TOP10 pouze jednou.' });
+      return;
+    }
+    await setFinalSettings({
+      enabled: finalEnabled,
+      manual: useManualTop10,
+      top10PersonalNumbers: cleaned
+    });
+    toast({ title: 'Nastavení uloženo', description: 'Finále TOP10 bylo aktualizováno.' });
+  };
 
   const handleResetProgress = () => {
     resetAllProgress();
@@ -1299,6 +1343,55 @@ export const AdminDashboard = () => {
                     </div>
                   </div>
                 </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Finále TOP10</CardTitle>
+                    <CardDescription>Skryté pro účastníky, dokud finále nezapnete.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Switch checked={finalEnabled} onCheckedChange={setFinalEnabled} />
+                      <span className="text-sm">Zapnout finále TOP10</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Switch checked={useManualTop10} onCheckedChange={setUseManualTop10} />
+                      <span className="text-sm">Ručně upravit TOP10</span>
+                      <Button type="button" variant="outline" onClick={handleApplyAutoTop10}>
+                        Načíst z vyhodnocení
+                      </Button>
+                    </div>
+
+                    {useManualTop10 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {manualTop10.map((value, index) => (
+                          <div key={`manual-top10-${index}`} className="space-y-1">
+                            <Label className="text-xs">#{index + 1}</Label>
+                            <Select
+                              value={value}
+                              onValueChange={(nextValue) => {
+                                setManualTop10(prev => prev.map((item, idx) => idx === index ? nextValue : item));
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Vyberte účastníka" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {evaluationOptions.map(option => (
+                                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <Button onClick={handleSaveFinalSettings}>
+                      Uložit nastavení finále
+                    </Button>
+                  </CardContent>
+                </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <Card>

@@ -66,6 +66,15 @@ CREATE TABLE IF NOT EXISTS public.winners (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
+-- Final votes table
+CREATE TABLE IF NOT EXISTS public.final_votes (
+    id BIGSERIAL PRIMARY KEY,
+    voter_id BIGINT REFERENCES public.users(id) ON DELETE CASCADE,
+    scores JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    UNIQUE(voter_id)
+);
+
 -- Notifications table
 CREATE TABLE IF NOT EXISTS public.notifications (
     id BIGSERIAL PRIMARY KEY,

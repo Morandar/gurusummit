@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { BoothCodeModal } from '@/components/Modals/BoothCodeModal';
@@ -12,6 +13,7 @@ import { ProfileEditModal } from '@/components/Profile/ProfileEditModal';
 import { ScrollingBanner } from '@/components/ScrollingBanner';
 import { Clock, MapPin, Trophy, Calendar, Smartphone, Lock, User, DollarSign, Award, Bell, Presentation, Coffee, Wrench, Users2 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
+import { supabase } from '@/lib/supabase';
 
 interface ParticipantDashboardProps {
   user: any;
@@ -20,15 +22,78 @@ interface ParticipantDashboardProps {
 }
 
 export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: ParticipantDashboardProps) => {
-  const { booths, program, users, isLoading, discountedPhones, banners, banner } = useData();
+  const { booths, program, users, isLoading, discountedPhones, banners, banner, finalSettings } = useData();
   const [timeToNext, setTimeToNext] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [selectedBooth, setSelectedBooth] = useState<{ id: number; name: string } | null>(null);
+  const [finalScores, setFinalScores] = useState<Record<string, number>>({});
+  const [finalVoteSubmitted, setFinalVoteSubmitted] = useState(false);
+  const [finalVoteLoading, setFinalVoteLoading] = useState(false);
   
   // Get current user data from global state
   const currentUser = users.find(u => u.personalNumber === user.personalNumber);
   const visitedBooths = currentUser?.visitedBooths || [];
   const progress = booths.length > 0 ? (visitedBooths.length / booths.length) * 100 : 0;
+
+  const finalTop10Users = useMemo(() => {
+    const list = finalSettings?.top10PersonalNumbers || [];
+    return list
+      .map(personalNumber => users.find(u => String(u.personalNumber) === String(personalNumber)))
+      .filter(Boolean) as any[];
+  }, [finalSettings, users]);
+
+  useEffect(() => {
+    const loadFinalVote = async () => {
+      if (!finalSettings?.enabled || !currentUser) return;
+      const { data, error } = await supabase
+        .from('final_votes')
+        .select('scores')
+        .eq('voter_id', currentUser.id)
+        .maybeSingle();
+      if (error) {
+        console.error('Error loading final vote:', error);
+        return;
+      }
+      if (data?.scores) {
+        setFinalVoteSubmitted(true);
+        try {
+          setFinalScores(data.scores as Record<string, number>);
+        } catch {
+          // ignore parsing errors
+        }
+      }
+    };
+    loadFinalVote();
+  }, [finalSettings, currentUser]);
+
+  const handleFinalScoreChange = (personalNumber: string, value: string) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return;
+    const clamped = Math.max(0, Math.min(10, numeric));
+    setFinalScores(prev => ({ ...prev, [personalNumber]: clamped }));
+  };
+
+  const handleSubmitFinalVotes = async () => {
+    if (!currentUser) return;
+    if (finalVoteSubmitted) return;
+    const missing = finalTop10Users.filter(u => finalScores[String(u.personalNumber)] == null);
+    if (missing.length > 0) {
+      alert('Vyplňte hodnocení pro všech 10 účastníků.');
+      return;
+    }
+    setFinalVoteLoading(true);
+    const { error } = await supabase.from('final_votes').insert([{
+      voter_id: currentUser.id,
+      scores: finalScores,
+      created_at: new Date().toISOString()
+    }]);
+    setFinalVoteLoading(false);
+    if (error) {
+      alert(`Chyba při odeslání hlasů: ${error.message}`);
+      return;
+    }
+    setFinalVoteSubmitted(true);
+  };
 
   // Get current program events (what's happening now) - can return multiple overlapping events
   const getCurrentEvents = () => {
@@ -322,10 +387,13 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
         </div>
 
         <Tabs defaultValue="booths" className="space-y-4">
-           <TabsList className="grid w-full grid-cols-3 h-12">
+           <TabsList className={`grid w-full h-12 ${finalSettings?.enabled ? 'grid-cols-4' : 'grid-cols-3'}`}>
              <TabsTrigger value="booths" className="text-sm sm:text-base">Stánky</TabsTrigger>
              <TabsTrigger value="program" className="text-sm sm:text-base">Program</TabsTrigger>
              <TabsTrigger value="phones" className="text-sm sm:text-base">Zlevněné telefony</TabsTrigger>
+             {finalSettings?.enabled && (
+               <TabsTrigger value="final" className="text-sm sm:text-base">Finale</TabsTrigger>
+             )}
            </TabsList>
 
           <TabsContent value="booths" className="space-y-4">
@@ -557,6 +625,57 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
               </CardContent>
             </Card>
           </TabsContent>
+
+          {finalSettings?.enabled && (
+            <TabsContent value="final" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                    <Award className="h-5 w-5 text-yellow-600" />
+                    Finále TOP10
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Ohodnoťte všech 10 účastníků čísly 0–10. Odeslat lze až po vyplnění všech hodnocení.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {finalTop10Users.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">TOP10 zatím není nastaveno.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {finalTop10Users.map((u, idx) => (
+                        <div key={`final-${u.id}`} className="flex items-center gap-3 border rounded-md p-3">
+                          <div className="w-6 text-sm text-muted-foreground">{idx + 1}.</div>
+                          <div className="flex-1">
+                            <div className="font-medium text-sm sm:text-base">{u.firstName} {u.lastName}</div>
+                            <div className="text-xs text-muted-foreground">{u.personalNumber}</div>
+                          </div>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={10}
+                            step={1}
+                            disabled={finalVoteSubmitted}
+                            value={finalScores[String(u.personalNumber)] ?? ''}
+                            onChange={(e) => handleFinalScoreChange(String(u.personalNumber), e.target.value)}
+                            className="w-20 text-center"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleSubmitFinalVotes}
+                      disabled={finalVoteSubmitted || finalVoteLoading || finalTop10Users.length !== 10}
+                    >
+                      {finalVoteSubmitted ? 'Hlas odeslán' : finalVoteLoading ? 'Odesílám…' : 'Odeslat hodnocení'}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </div>
