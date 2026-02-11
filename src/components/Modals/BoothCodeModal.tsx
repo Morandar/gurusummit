@@ -6,6 +6,9 @@ import { Label } from '@/components/ui/label';
 import { KeyRound, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BoothQuestion, useData } from '@/context/DataContext';
+import QrScanner from 'qr-scanner';
+
+QrScanner.WORKER_PATH = new URL('qr-scanner/qr-scanner-worker.min.js', import.meta.url).toString();
 
 interface BoothCodeModalProps {
   isOpen: boolean;
@@ -22,9 +25,13 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
   const [selectedAnswer, setSelectedAnswer] = useState<'a' | 'b' | 'c' | ''>('');
   const [currentQuestion, setCurrentQuestion] = useState<BoothQuestion | null>(null);
   const [step, setStep] = useState<'code' | 'question'>('code');
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerError, setScannerError] = useState<string | null>(null);
   const { toast } = useToast();
   const { booths, isCodeEntryAllowed, visitBooth, submitBoothAnswer } = useData();
   const inputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const scannerRef = useRef<QrScanner | null>(null);
 
   const pickQuestion = (questions: BoothQuestion[]) => {
     if (questions.length === 0) return null;
@@ -91,6 +98,45 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
     setSelectedAnswer('');
     setStep(visitStatus === 'pending' ? 'question' : 'code');
   }, [booths, boothId, isOpen, visitStatus, toast]);
+
+  useEffect(() => {
+    if (!scannerOpen) {
+      if (scannerRef.current) {
+        scannerRef.current.stop();
+        scannerRef.current.destroy();
+        scannerRef.current = null;
+      }
+      return;
+    }
+
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+
+    setScannerError(null);
+    const scanner = new QrScanner(
+      videoEl,
+      (result) => {
+        setCode(result.data || '');
+        setScannerOpen(false);
+      },
+      {
+        highlightScanRegion: true,
+        highlightCodeOutline: true,
+      }
+    );
+    scannerRef.current = scanner;
+
+    scanner.start().catch((err) => {
+      setScannerError(typeof err === 'string' ? err : 'Nepodařilo se spustit kameru.');
+      setScannerOpen(false);
+    });
+
+    return () => {
+      scanner.stop();
+      scanner.destroy();
+      scannerRef.current = null;
+    };
+  }, [scannerOpen]);
 
   const validateCode = (inputCode: string) => {
     const booth = booths.find(b => b.id === boothId);
@@ -208,6 +254,8 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
     setSelectedAnswer('');
     setCurrentQuestion(null);
     setStep('code');
+    setScannerOpen(false);
+    setScannerError(null);
     onClose();
   };
 
@@ -244,6 +292,38 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
                   <p className="text-green-600 font-semibold">✓ Funguje na všech zařízeních</p>
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setScannerOpen(true)}
+                >
+                  Načíst QR kód
+                </Button>
+                {scannerError && (
+                  <p className="text-xs text-destructive text-center">
+                    {scannerError}
+                  </p>
+                )}
+              </div>
+
+              {scannerOpen && (
+                <div className="space-y-2">
+                  <div className="rounded-md border border-border overflow-hidden">
+                    <video ref={videoRef} className="w-full h-56 object-cover" muted playsInline />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setScannerOpen(false)}
+                  >
+                    Zavřít skener
+                  </Button>
+                </div>
+              )}
 
               <div className="flex space-x-2">
                 <Button
