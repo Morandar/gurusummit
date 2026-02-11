@@ -224,6 +224,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     return Math.min(100, Math.round((visitedCount / totalBooths) * 100));
   };
 
+  const debugLog = (...args: any[]) => {
+    if (import.meta.env.DEV) debugLog(...args);
+  };
+  const debugTime = (label: string) => {
+    if (import.meta.env.DEV) debugTime(label);
+  };
+  const debugTimeEnd = (label: string) => {
+    if (import.meta.env.DEV) debugTimeEnd(label);
+  };
+
   const fetchAllVisitRows = async (columns: string, filter?: (query: any) => any) => {
     const pageSize = 1000;
     const maxPages = 100;
@@ -455,7 +465,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   // --- Supabase fetchers ---
   const fetchUsers = async (totalBooths?: number) => {
-    console.log('👥 DataContext: Starting optimized fetchUsers...');
+    debugLog('👥 DataContext: Starting optimized fetchUsers...');
     const usersStartTime = Date.now();
 
     try {
@@ -470,8 +480,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      console.log(`👥 DataContext: Fetched ${usersData.length} users from database`);
-      console.log('👥 DataContext: Sample user data:', usersData[0]); // Debug first user
+      debugLog(`👥 DataContext: Fetched ${usersData.length} users from database`);
+      debugLog('👥 DataContext: Sample user data:', usersData[0]); // Debug first user
 
       const { data: visitsData, error: visitsError } = await fetchAllVisitRows('attendee_id, booth_id, answer_correct');
 
@@ -497,7 +507,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
                 : 'pending';
           answersByUser.get(visit.attendee_id)![visit.booth_id] = status;
         });
-        console.log(`👥 DataContext: Processed ${visitsData.length} visit rows into unique booth counts`);
+        debugLog(`👥 DataContext: Processed ${visitsData.length} visit rows into unique booth counts`);
       } else if (visitsError) {
         console.warn('⚠️ DataContext: Could not fetch visit details:', visitsError);
       }
@@ -527,8 +537,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       });
 
       const endTime = Date.now();
-      console.log(`👥 DataContext: Total optimized fetchUsers time: ${endTime - usersStartTime}ms`);
-      console.log('👥 DataContext: Final user stats:', {
+      debugLog(`👥 DataContext: Total optimized fetchUsers time: ${endTime - usersStartTime}ms`);
+      debugLog('👥 DataContext: Final user stats:', {
         totalUsers: mappedUsers.length,
         totalVisits: mappedUsers.reduce((sum, u) => sum + u.visits, 0),
         sampleUser: mappedUsers[0]
@@ -541,7 +551,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const fetchBooths = async () => {
-    console.log('🏪 DataContext: Starting fetchBooths with visit counts...');
+    debugLog('🏪 DataContext: Starting fetchBooths with visit counts...');
     const startTime = Date.now();
 
     try {
@@ -556,7 +566,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      console.log(`🏪 DataContext: Fetched ${boothsData?.length || 0} booths from database`);
+      debugLog(`🏪 DataContext: Fetched ${boothsData?.length || 0} booths from database`);
 
       const boothVisitorSets: Map<number, Set<number>> = new Map();
       const { data: visitsData, error: visitsError } = await fetchAllVisitRows('booth_id, attendee_id');
@@ -577,7 +587,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         visitCounts[boothId] = visitors.size;
       });
 
-      console.log(`🏪 DataContext: Processed visit counts for ${Object.keys(visitCounts).length} booths`);
+      debugLog(`🏪 DataContext: Processed visit counts for ${Object.keys(visitCounts).length} booths`);
 
       const boothsWithVisits = (boothsData || []).map((booth: any) => ({
         ...booth,
@@ -585,7 +595,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       }));
 
       const endTime = Date.now();
-      console.log(`🏪 DataContext: Total fetchBooths time: ${endTime - startTime}ms`);
+      debugLog(`🏪 DataContext: Total fetchBooths time: ${endTime - startTime}ms`);
 
       setBooths(boothsWithVisits as any);
     } catch (error) {
@@ -650,7 +660,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     // Check authentication status
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      console.log({
+      debugLog({
         hasSession: !!sessionData?.session,
         userEmail: sessionData?.session?.user?.email || 'none',
         expiresAt: sessionData?.session?.expires_at ? new Date(sessionData.session.expires_at * 1000).toISOString() : 'none'
@@ -832,57 +842,57 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      console.log('🚀 DataContext: Starting data fetch...');
+      debugLog('🚀 DataContext: Starting data fetch...');
       const startTime = Date.now();
 
       try {
-        console.log('📊 DataContext: Fetching booth count...');
+        debugLog('📊 DataContext: Fetching booth count...');
         const { data: boothsData, error: boothsError } = await supabase.from('booths').select('*').order('id');
         if (boothsError) {
           console.error('❌ DataContext: Error fetching booth count:', boothsError);
           return;
         }
         const totalBooths = boothsData?.length || 0;
-        console.log(`📊 DataContext: Found ${totalBooths} booths`);
+        debugLog(`📊 DataContext: Found ${totalBooths} booths`);
 
-        console.time('fetchBooths');
+        debugTime('fetchBooths');
         await fetchBooths(); // Fetch booths first
-        console.timeEnd('fetchBooths');
+        debugTimeEnd('fetchBooths');
 
-        console.time('fetchUsers');
+        debugTime('fetchUsers');
         await fetchUsers(totalBooths); // Pass booth count to users
-        console.timeEnd('fetchUsers');
+        debugTimeEnd('fetchUsers');
 
-        console.time('fetchProgram');
+        debugTime('fetchProgram');
         await fetchProgram();
-        console.timeEnd('fetchProgram');
+        debugTimeEnd('fetchProgram');
 
-        console.time('fetchNotifications');
+        debugTime('fetchNotifications');
         await fetchNotifications(); // Fetch notifications from database
-        console.timeEnd('fetchNotifications');
+        debugTimeEnd('fetchNotifications');
 
-        console.time('fetchBanner');
+        debugTime('fetchBanner');
         await fetchBanner(); // Fetch banner from database
-        console.timeEnd('fetchBanner');
+        debugTimeEnd('fetchBanner');
 
-        console.time('fetchWinners');
+        debugTime('fetchWinners');
         await fetchWinners(); // Fetch winners from database
-        console.timeEnd('fetchWinners');
+        debugTimeEnd('fetchWinners');
 
-        console.time('fetchDiscountedPhones');
+        debugTime('fetchDiscountedPhones');
         await fetchDiscountedPhones(); // Fetch discounted phones from database
-        console.timeEnd('fetchDiscountedPhones');
+        debugTimeEnd('fetchDiscountedPhones');
 
-        console.time('fetchSettings');
+        debugTime('fetchSettings');
         await fetchSettings(); // Fetch settings from database
-        console.timeEnd('fetchSettings');
+        debugTimeEnd('fetchSettings');
 
         const totalTime = Date.now() - startTime;
-        console.log(`✅ DataContext: All data fetched successfully in ${totalTime}ms`);
+        debugLog(`✅ DataContext: All data fetched successfully in ${totalTime}ms`);
       } catch (error) {
         console.error('❌ DataContext: Unexpected error in fetchData:', error);
       } finally {
-        console.log('🔄 DataContext: Setting isLoading to false');
+        debugLog('🔄 DataContext: Setting isLoading to false');
         setIsLoading(false);
       }
     };
@@ -892,7 +902,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     let pollCount = 0;
     const bannerInterval = setInterval(() => {
       pollCount++;
-      console.log(`📡 DataContext: Banner poll #${pollCount}`);
+      debugLog(`📡 DataContext: Banner poll #${pollCount}`);
       fetchBanner();
     }, 300000); // Check every 5 minutes instead of 30 seconds
 
@@ -903,7 +913,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const visitBooth = async (userId: number, boothId: number): Promise<'created' | 'pending' | 'answered' | 'error'> => {
-    console.log(`🏪 DataContext: visitBooth called - userId: ${userId}, boothId: ${boothId}`);
+    debugLog(`🏪 DataContext: visitBooth called - userId: ${userId}, boothId: ${boothId}`);
 
     const targetBooth = booths.find(b => b.id === boothId);
     const targetUser = users.find(u => u.id === userId);
@@ -928,7 +938,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         return 'pending';
       }
 
-      console.log('💾 DataContext: Inserting visit into database...');
+      debugLog('💾 DataContext: Inserting visit into database...');
       // Try to insert new visit into database
       // If it already exists, the unique constraint will be violated
       const { error: insertError } = await supabase
@@ -944,7 +954,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (insertError) {
         // Check if it's a unique constraint violation (user already visited this booth)
         if (insertError.code === '23505') { // PostgreSQL unique constraint violation
-          console.log('⚠️ DataContext: User already visited this booth');
+          debugLog('⚠️ DataContext: User already visited this booth');
           const { data: existingVisit } = await supabase
             .from('visits')
             .select('answer_correct')
@@ -962,22 +972,22 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         return 'error';
       }
 
-      console.log('✅ DataContext: Visit inserted successfully, updating local state...');
+      debugLog('✅ DataContext: Visit inserted successfully, updating local state...');
 
       // Update local state - add to user's visited booths
       setUsersState(prevUsers => {
-        console.log('🔄 DataContext: setUsersState called with prevUsers length:', prevUsers.length);
+        debugLog('🔄 DataContext: setUsersState called with prevUsers length:', prevUsers.length);
         const updatedUsers = prevUsers.map(user => {
           if (user.id !== userId) return user;
           const already = user.visitedBooths.includes(boothId);
           if (already) {
-            console.log('⚠️ DataContext: User already visited this booth');
+            debugLog('⚠️ DataContext: User already visited this booth');
             return user;
           }
 
           const newVisitedBooths = [...user.visitedBooths, boothId];
           const newProgress = calculateProgress(newVisitedBooths.length, booths.length);
-          console.log(`📊 DataContext: Updated user progress: ${newProgress}% (${newVisitedBooths.length}/${booths.length})`);
+          debugLog(`📊 DataContext: Updated user progress: ${newProgress}% (${newVisitedBooths.length}/${booths.length})`);
           const newAnswers = {
             ...(user.boothAnswers || {}),
             [boothId]: 'pending' as const
@@ -991,17 +1001,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
             boothAnswers: newAnswers,
             points: calculatePoints(newVisitedBooths, newAnswers)
           };
-          console.log('👤 DataContext: Updated user:', updatedUser);
+          debugLog('👤 DataContext: Updated user:', updatedUser);
           return updatedUser;
         });
-        console.log('🔄 DataContext: Returning updated users array with length:', updatedUsers.length);
+        debugLog('🔄 DataContext: Returning updated users array with length:', updatedUsers.length);
         return updatedUsers;
       });
 
       // Update progress in database to keep it in sync
       const newVisitedBooths = [...targetUser.visitedBooths, boothId];
       const newProgress = calculateProgress(newVisitedBooths.length, booths.length);
-      console.log('💾 DataContext: Updating user progress in database...');
+      debugLog('💾 DataContext: Updating user progress in database...');
       await supabase
         .from('users')
         .update({ progress: newProgress, visits: targetUser.visits + 1 })
@@ -1009,16 +1019,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       // Update booth visit count in local state
       setBooths(prevBooths => {
-        console.log('🏪 DataContext: Updating booth visit count for booth', boothId);
+        debugLog('🏪 DataContext: Updating booth visit count for booth', boothId);
         const updatedBooths = prevBooths.map(booth => (
           booth.id === boothId ? { ...booth, visits: booth.visits + 1 } : booth
         ));
         const updatedBooth = updatedBooths.find(b => b.id === boothId);
-        console.log('🏪 DataContext: Booth visit count updated to:', updatedBooth?.visits);
+        debugLog('🏪 DataContext: Booth visit count updated to:', updatedBooth?.visits);
         return updatedBooths;
       });
 
-      console.log('✅ DataContext: Booth visit completed successfully');
+      debugLog('✅ DataContext: Booth visit completed successfully');
       return 'created';
     } catch (error) {
       console.error('❌ DataContext: Visit booth error:', error);

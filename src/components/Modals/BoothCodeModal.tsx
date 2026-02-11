@@ -8,8 +8,6 @@ import { useToast } from '@/hooks/use-toast';
 import { BoothQuestion, useData } from '@/context/DataContext';
 import QrScanner from 'qr-scanner';
 
-QrScanner.WORKER_PATH = new URL('qr-scanner/qr-scanner-worker.min.js', import.meta.url).toString();
-
 interface BoothCodeModalProps {
   isOpen: boolean;
   onClose: () => void;

@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const setUserWithLogging = (newUser: User | null) => {
-    console.log('AuthContext: setUser called with:', newUser);
+    if (import.meta.env.DEV) console.log('AuthContext: setUser called with:', newUser);
     setUser(newUser);
   };
 
@@ -238,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    console.log('AuthContext: logout called');
+    if (import.meta.env.DEV) console.log('AuthContext: logout called');
     setUserWithLogging(null);
     // Clear localStorage for participant users
     localStorage.removeItem('authUser');
@@ -251,7 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
         if (parsedUser && (parsedUser.type === 'participant' || parsedUser.type === 'booth')) {
-          console.log('AuthContext: Setting user from storage:', parsedUser);
+          if (import.meta.env.DEV) console.log('AuthContext: Setting user from storage:', parsedUser);
           setUserWithLogging(parsedUser);
           (window as any).__authUser = parsedUser;
         }

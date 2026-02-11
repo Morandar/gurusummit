@@ -1051,7 +1051,7 @@ export const AdminDashboard = () => {
   };
 
   const handleToggleBanner = async (banner: Banner, isActive: boolean) => {
-    console.log({
+    if (import.meta.env.DEV) console.log({
       id: banner.id,
       text: banner.text.substring(0, 30) + (banner.text.length > 30 ? '...' : ''),
       fromActive: banner.isActive,

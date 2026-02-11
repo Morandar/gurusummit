@@ -155,7 +155,7 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
                       <Select
                         value={position}
                         onValueChange={(value) => {
-                          console.log('Position selected:', value);
+                          if (import.meta.env.DEV) console.log('Position selected:', value);
                           setPosition(value);
                         }}
                         required
