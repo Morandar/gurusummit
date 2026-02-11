@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -76,6 +76,12 @@ export const AdminDashboard = () => {
   });
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [allBanners, setAllBanners] = useState<Banner[]>([]);
+
+  // Evaluation (CSV import) state
+  const [evaluationRows, setEvaluationRows] = useState<Record<string, string>[]>([]);
+  const [evaluationHeaders, setEvaluationHeaders] = useState<string[]>([]);
+  const [evaluationKeyField, setEvaluationKeyField] = useState<string>('');
+  const [evaluationTieField, setEvaluationTieField] = useState<string>('');
 
   
   // Local draft state for homepage texts
@@ -234,6 +240,122 @@ export const AdminDashboard = () => {
       description: 'CSV soubor se stánky byl stažen',
     });
   };
+
+  const splitCSVLine = (line: string) => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+        continue;
+      }
+      if (char === ',' && !inQuotes) {
+        result.push(current);
+        current = '';
+        continue;
+      }
+      current += char;
+    }
+    result.push(current);
+    return result.map(value => value.trim());
+  };
+
+  const parseCSV = (text: string) => {
+    const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+    if (lines.length === 0) {
+      return { headers: [] as string[], rows: [] as Record<string, string>[] };
+    }
+    const headers = splitCSVLine(lines[0]).map(header => header.trim());
+    const rows = lines.slice(1).map(line => {
+      const values = splitCSVLine(line);
+      const row: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        row[header] = values[index] ?? '';
+      });
+      return row;
+    });
+    return { headers, rows };
+  };
+
+  const handleEvaluationFileChange = (file?: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const text = String(reader.result || '');
+        const { headers, rows } = parseCSV(text);
+        if (headers.length === 0) {
+          toast({ title: 'CSV je prázdné', description: 'Soubor neobsahuje žádné sloupce.' });
+          return;
+        }
+        setEvaluationHeaders(headers);
+        setEvaluationRows(rows);
+        if (!evaluationKeyField) {
+          setEvaluationKeyField(headers[0] || '');
+        }
+        if (!evaluationTieField) {
+          setEvaluationTieField(headers[1] || headers[0] || '');
+        }
+        toast({ title: 'CSV načteno', description: `Načteno řádků: ${rows.length}` });
+      } catch (error: any) {
+        toast({ title: 'Chyba při čtení CSV', description: error?.message || 'Soubor se nepodařilo načíst.' });
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const evaluationData = useMemo(() => {
+    const tieMap = new Map<string, number>();
+    if (evaluationKeyField) {
+      evaluationRows.forEach(row => {
+        const key = String(row[evaluationKeyField] ?? '').trim();
+        if (!key) return;
+        const raw = evaluationTieField ? row[evaluationTieField] : '';
+        const value = Number(String(raw ?? '').replace(',', '.'));
+        tieMap.set(key, Number.isFinite(value) ? value : 0);
+      });
+    }
+
+    const rows = users.map(user => {
+      const boothAnswers = user.boothAnswers || {};
+      const answerValues = Object.values(boothAnswers);
+      const correct = answerValues.filter(status => status === 'correct').length;
+      const wrong = answerValues.filter(status => status === 'wrong').length;
+      const tieBreaker = tieMap.get(String(user.personalNumber)) ?? 0;
+      return {
+        user,
+        points: user.points ?? 0,
+        visits: user.visits,
+        correct,
+        wrong,
+        tieBreaker,
+        hasTie: tieMap.has(String(user.personalNumber))
+      };
+    });
+
+    rows.sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.correct !== a.correct) return b.correct - a.correct;
+      if (b.tieBreaker !== a.tieBreaker) return b.tieBreaker - a.tieBreaker;
+      return b.visits - a.visits;
+    });
+
+    const ranked = rows.map((row, index) => ({ ...row, rank: index + 1 }));
+    const matchedCount = ranked.filter(r => r.hasTie).length;
+    return {
+      rows: ranked,
+      top10: ranked.slice(0, 10),
+      top11to30: ranked.slice(10, 30),
+      matchedCount
+    };
+  }, [users, evaluationRows, evaluationKeyField, evaluationTieField]);
 
   const handleResetProgress = () => {
     resetAllProgress();
@@ -965,8 +1087,9 @@ export const AdminDashboard = () => {
         </div>
 
         <Tabs defaultValue="users" className="space-y-6">
-           <TabsList className="grid w-full grid-cols-7">
+           <TabsList className="grid w-full grid-cols-8">
              <TabsTrigger value="users">Účastníci</TabsTrigger>
+             <TabsTrigger value="evaluation">Vyhodnocení</TabsTrigger>
              <TabsTrigger value="booths">Stánky</TabsTrigger>
              <TabsTrigger value="program">Program</TabsTrigger>
              <TabsTrigger value="phones">Zlevněné telefony</TabsTrigger>
@@ -1115,6 +1238,171 @@ export const AdminDashboard = () => {
                     </tbody>
                   </table>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Evaluation Tab */}
+          <TabsContent value="evaluation" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Vyhodnocení</h3>
+              <div className="flex items-center gap-3">
+                <Label htmlFor="evaluation-csv" className="text-sm text-muted-foreground">Import CSV</Label>
+                <Input
+                  id="evaluation-csv"
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => handleEvaluationFileChange(e.target.files?.[0])}
+                />
+              </div>
+            </div>
+
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm">Sloupec pro spárování</Label>
+                    <Select
+                      value={evaluationKeyField}
+                      onValueChange={(value) => setEvaluationKeyField(value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Vyberte sloupec" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {evaluationHeaders.map(header => (
+                          <SelectItem key={header} value={header}>{header}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Tie‑breaker sloupec</Label>
+                    <Select
+                      value={evaluationTieField}
+                      onValueChange={(value) => setEvaluationTieField(value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Vyberte sloupec" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {evaluationHeaders.map(header => (
+                          <SelectItem key={header} value={header}>{header}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <div className="text-sm text-muted-foreground">
+                      Načteno řádků: <span className="font-semibold">{evaluationRows.length}</span><br />
+                      Spárováno: <span className="font-semibold">{evaluationData.matchedCount}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">TOP 10</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="border-b">
+                            <tr>
+                              <th className="text-left p-3">#</th>
+                              <th className="text-left p-3">Jméno</th>
+                              <th className="text-left p-3">Body</th>
+                              <th className="text-left p-3">Správně</th>
+                              <th className="text-left p-3">Špatně</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {evaluationData.top10.map(row => (
+                              <tr key={row.user.id} className="border-b">
+                                <td className="p-3">{row.rank}</td>
+                                <td className="p-3">{row.user.firstName} {row.user.lastName}</td>
+                                <td className="p-3">{row.points}</td>
+                                <td className="p-3">{row.correct}</td>
+                                <td className="p-3">{row.wrong}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">TOP 11–30</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="border-b">
+                            <tr>
+                              <th className="text-left p-3">#</th>
+                              <th className="text-left p-3">Jméno</th>
+                              <th className="text-left p-3">Body</th>
+                              <th className="text-left p-3">Správně</th>
+                              <th className="text-left p-3">Špatně</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {evaluationData.top11to30.map(row => (
+                              <tr key={row.user.id} className="border-b">
+                                <td className="p-3">{row.rank}</td>
+                                <td className="p-3">{row.user.firstName} {row.user.lastName}</td>
+                                <td className="p-3">{row.points}</td>
+                                <td className="p-3">{row.correct}</td>
+                                <td className="p-3">{row.wrong}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Všichni účastníci</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="border-b">
+                          <tr>
+                            <th className="text-left p-3">#</th>
+                            <th className="text-left p-3">Jméno</th>
+                            <th className="text-left p-3">Osobní číslo</th>
+                            <th className="text-left p-3">Body</th>
+                            <th className="text-left p-3">Návštěvy</th>
+                            <th className="text-left p-3">Správně</th>
+                            <th className="text-left p-3">Špatně</th>
+                            <th className="text-left p-3">Tie‑breaker</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {evaluationData.rows.map(row => (
+                            <tr key={row.user.id} className="border-b">
+                              <td className="p-3">{row.rank}</td>
+                              <td className="p-3">{row.user.firstName} {row.user.lastName}</td>
+                              <td className="p-3">{row.user.personalNumber}</td>
+                              <td className="p-3">{row.points}</td>
+                              <td className="p-3">{row.visits}</td>
+                              <td className="p-3">{row.correct}</td>
+                              <td className="p-3">{row.wrong}</td>
+                              <td className="p-3">{row.tieBreaker}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
               </CardContent>
             </Card>
           </TabsContent>

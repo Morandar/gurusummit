@@ -303,6 +303,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [banner, setBanner] = useState<Banner | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
 
+  const calculatePoints = (visitedBooths: number[], boothAnswers?: Record<number, 'pending' | 'correct' | 'wrong'>) => {
+    const correctCount = Object.values(boothAnswers || {}).filter(status => status === 'correct').length;
+    return visitedBooths.length + correctCount * 2;
+  };
+
   // Registrace účastníka: hashování hesla a uložení do DB
   const registerParticipant = async (userData: Omit<User, 'id' | 'progress' | 'visits' | 'visitedBooths' | 'password_hash'> & { password: string }) => {
     try {
@@ -1453,7 +1458,3 @@ export const useData = () => {
   }
   return context;
 };
-  const calculatePoints = (visitedBooths: number[], boothAnswers?: Record<number, 'pending' | 'correct' | 'wrong'>) => {
-    const correctCount = Object.values(boothAnswers || {}).filter(status => status === 'correct').length;
-    return visitedBooths.length + correctCount * 2;
-  };
