@@ -12,6 +12,7 @@ import { LogOut, Users, Trophy, Clock, BarChart3, KeyRound, Presentation, Coffee
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { ScrollingBanner } from '@/components/ScrollingBanner';
+import { QRCodeCanvas } from 'qrcode.react';
 
 export const BoothDashboard = () => {
   const { user, logout } = useAuth();
@@ -208,6 +209,11 @@ export const BoothDashboard = () => {
                           <span className="text-muted-foreground">Kód není nastaven</span>
                         )}
                       </div>
+                      {boothCode && (
+                        <div className="rounded-lg border border-border bg-white p-3">
+                          <QRCodeCanvas value={boothCode} size={220} />
+                        </div>
+                      )}
                     </div>
                   )}
                   <p className="text-sm text-muted-foreground mt-2">Tento kód zadávají účastníci do své aplikace</p>
