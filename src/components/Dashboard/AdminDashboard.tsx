@@ -1003,12 +1003,15 @@ export const AdminDashboard = () => {
                         <th className="text-left p-4">Osobní číslo</th>
                         <th className="text-left p-4">Pozice</th>
                         <th className="text-left p-4">Návštěvy</th>
+                        <th className="text-left p-4">Body</th>
                         <th className="text-left p-4">Pokrok</th>
                         <th className="text-left p-4">Akce</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {users.map((user) => (
+                      {[...users]
+                        .sort((a, b) => (b.points ?? 0) - (a.points ?? 0))
+                        .map((user) => (
                         <tr key={user.id} className="border-b hover:bg-muted/50">
                           <td className="p-4">
                             <div className="flex items-center gap-2">
@@ -1067,6 +1070,9 @@ export const AdminDashboard = () => {
                           <td className="p-4">{user.position}</td>
                           <td className="p-4">
                             <Badge variant="secondary">{user.visits}</Badge>
+                          </td>
+                          <td className="p-4">
+                            <Badge variant="outline">{user.points ?? 0}</Badge>
                           </td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">

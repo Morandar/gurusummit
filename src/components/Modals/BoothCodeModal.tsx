@@ -191,7 +191,7 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
     if (isCorrect) {
       toast({
         title: 'Správně! 🎉',
-        description: 'Získali jste 1 bod za správnou odpověď.',
+        description: 'Získali jste 2 body za správnou odpověď.',
       });
     } else {
       toast({

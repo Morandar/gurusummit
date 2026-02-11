@@ -13,6 +13,7 @@ interface User {
   progress: number;
   visitedBooths: number[];
   boothAnswers?: Record<number, 'pending' | 'correct' | 'wrong'>;
+  points?: number;
   profileImage?: string;
   password_hash?: string;
 }
@@ -283,6 +284,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           progress: 0,
           visitedBooths: [],
           boothAnswers: {},
+          points: 0,
         }
       ]);
       toast({ title: 'Uživatel přidán', description: 'Nový účastník byl vytvořen.' });
@@ -337,6 +339,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           progress: 0,
           visitedBooths: [],
           boothAnswers: {},
+          points: 0,
         }
       ]);
       toast({ title: 'Registrace úspěšná', description: 'Můžete se přihlásit.' });
@@ -369,6 +372,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       progress: data.progress || 0,
       visitedBooths: data.visitedbooths || [],
       boothAnswers: {},
+      points: calculatePoints(data.visitedbooths || [], {}),
       profileImage: data.profileimage,
       password_hash: data.password_hash
     };
@@ -476,6 +480,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         const userBooths = visitsByUser.get(user.id) || new Set<number>();
         const visitedBooths = Array.from(userBooths);
         const visitCount = visitedBooths.length;
+        const boothAnswers = answersByUser.get(user.id) || {};
 
         return {
           id: user.id,
@@ -486,7 +491,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           visits: visitCount,
           progress: calculateProgress(visitCount, boothCount),
           visitedBooths: visitedBooths, // Unique booth IDs visited by the user
-          boothAnswers: answersByUser.get(user.id) || {},
+          boothAnswers,
+          points: calculatePoints(visitedBooths, boothAnswers),
           profileImage: user.profileimage,
           password_hash: user.password_hash
         };
@@ -932,16 +938,18 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           const newVisitedBooths = [...user.visitedBooths, boothId];
           const newProgress = calculateProgress(newVisitedBooths.length, booths.length);
           console.log(`📊 DataContext: Updated user progress: ${newProgress}% (${newVisitedBooths.length}/${booths.length})`);
+          const newAnswers = {
+            ...(user.boothAnswers || {}),
+            [boothId]: 'pending' as const
+          };
 
           const updatedUser = {
             ...user,
             visitedBooths: newVisitedBooths,
             visits: user.visits + 1,
             progress: newProgress,
-            boothAnswers: {
-              ...(user.boothAnswers || {}),
-              [boothId]: 'pending'
-            }
+            boothAnswers: newAnswers,
+            points: calculatePoints(newVisitedBooths, newAnswers)
           };
           console.log('👤 DataContext: Updated user:', updatedUser);
           return updatedUser;
@@ -998,12 +1006,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       setUsersState(prevUsers =>
         prevUsers.map(user => {
           if (user.id !== userId) return user;
+          const updatedAnswers = {
+            ...(user.boothAnswers || {}),
+            [boothId]: isCorrect ? 'correct' : 'wrong'
+          };
           return {
             ...user,
-            boothAnswers: {
-              ...(user.boothAnswers || {}),
-              [boothId]: isCorrect ? 'correct' : 'wrong'
-            }
+            boothAnswers: updatedAnswers,
+            points: calculatePoints(user.visitedBooths, updatedAnswers)
           };
         })
       );
@@ -1042,7 +1052,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           visits: 0,
           progress: 0,
           visitedBooths: [],
-          boothAnswers: {}
+          boothAnswers: {},
+          points: 0
         }))
       );
 
@@ -1442,3 +1453,7 @@ export const useData = () => {
   }
   return context;
 };
+  const calculatePoints = (visitedBooths: number[], boothAnswers?: Record<number, 'pending' | 'correct' | 'wrong'>) => {
+    const correctCount = Object.values(boothAnswers || {}).filter(status => status === 'correct').length;
+    return visitedBooths.length + correctCount * 2;
+  };
