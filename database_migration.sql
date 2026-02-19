@@ -1,4 +1,4 @@
--- O2 Guru Summit 2025 Database Migration
+-- O2 Guru Summit Database Migration
 -- This script creates all necessary tables for the application
 
 -- Enable UUID extension if not already enabled

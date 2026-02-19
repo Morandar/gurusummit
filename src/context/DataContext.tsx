@@ -184,7 +184,7 @@ const initialCodeTimeSettings: CodeTimeSettings = {
 };
 
 const initialHomePageTexts: HomePageTexts = {
-  title: 'O2 Guru Summit 2025',
+  title: 'O2 Guru Summit',
   subtitle: 'Nejdůležitější technologický event roku',
   description: 'Sbírejte body návštěvou stánků a získejte hodnotné ceny',
   loginTitle: 'Přihlaste se do aplikace',

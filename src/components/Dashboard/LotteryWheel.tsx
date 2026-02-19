@@ -73,7 +73,7 @@ export const LotteryWheel = ({ isOpen, onClose }: LotteryWheelProps) => {
             <div className="flex-1 text-center">
               <CardTitle className="flex items-center justify-center gap-2 text-2xl">
                 <Trophy className="h-6 w-6" />
-                Kolo štěstí - O2 Guru Summit 2025
+                Kolo štěstí - O2 Guru Summit
               </CardTitle>
               <p className="text-white/90">
                 Slosování o super ceny pro účastníky s minimálně {lotterySettings.minimumPercentage}% pokrokem

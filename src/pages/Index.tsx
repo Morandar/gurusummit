@@ -8,70 +8,83 @@ import heroImage from '@/assets/hero-summit.jpg';
 
 const Index = () => {
   const { user, login, logout, setUserFromStorage, isLoading } = useAuth();
-  const { homePageTexts, registerParticipant, loginParticipant, isLoading: dataLoading } = useData();
+  const { homePageTexts, loginParticipant, isLoading: dataLoading } = useData();
 
-  const handleLogin = async (userType: 'participant' | 'booth' | 'admin', credentials: any) => {
-    if (userType === 'participant') {
-      // Handle participant registration/login through DataContext
-      const pn = credentials.personalNumber;
-      const pwd = credentials.password;
-      const isRegistering = credentials.firstName && credentials.lastName;
-      
-      if (isRegistering) {
-        // Registration flow
-        const success = await registerParticipant({
-          personalNumber: pn,
-          firstName: credentials.firstName,
-          lastName: credentials.lastName,
-          position: credentials.position || '',
-          password: pwd
-        });
-        
-        if (success) {
-          // Login after successful registration
-          const loggedInUser = await loginParticipant(pn, pwd);
-          if (loggedInUser) {
-            // Set user in AuthContext manually
-            const authUser = {
-              id: `participant-${pn}`,
-              personalNumber: pn,
-              firstName: loggedInUser.firstName,
-              lastName: loggedInUser.lastName,
-              type: 'participant' as const,
-              position: loggedInUser.position,
-            };
-            // Save to localStorage and set user state
-            localStorage.setItem('authUser', JSON.stringify(authUser));
-            setUserFromStorage(); // Update auth state without reload
-            return true;
-          }
-        }
-        return false;
-      } else {
-        // Login flow
-        const loggedInUser = await loginParticipant(pn, pwd);
-        if (loggedInUser) {
-          // Set user in AuthContext manually
-          const authUser = {
-            id: `participant-${pn}`,
-            personalNumber: pn,
-            firstName: loggedInUser.firstName,
-            lastName: loggedInUser.lastName,
-            type: 'participant' as const,
-            position: loggedInUser.position,
-          };
-          // Save to localStorage and set user state
-          localStorage.setItem('authUser', JSON.stringify(authUser));
-          setUserFromStorage(); // Update auth state without reload
-          return true;
-        }
-        return false;
-      }
+  const setParticipantSession = (personalNumber: string, profile?: { firstName?: string; lastName?: string; position?: string }) => {
+    const authUser = {
+      id: `participant-${personalNumber}`,
+      personalNumber,
+      firstName: profile?.firstName,
+      lastName: profile?.lastName,
+      type: 'participant' as const,
+      position: profile?.position,
+    };
+    localStorage.setItem('authUser', JSON.stringify(authUser));
+    setUserFromStorage();
+  };
+
+  const loginParticipantViaLdap = async (identifier: string, password: string): Promise<boolean> => {
+    const ldapUrl = String(import.meta.env.VITE_LDAP_AUTH_URL || '').trim();
+    if (!ldapUrl) return false;
+
+    try {
+      const response = await fetch(ldapUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier, password })
+      });
+
+      if (!response.ok) return false;
+      const payload = await response.json();
+      if (!payload?.success) return false;
+
+      const personalNumber = String(payload?.user?.personalNumber || identifier);
+      setParticipantSession(personalNumber, {
+        firstName: payload?.user?.firstName,
+        lastName: payload?.user?.lastName,
+        position: payload?.user?.position
+      });
+      return true;
+    } catch {
+      return false;
     }
-    
-    // For booth/admin, use original auth logic
-    const success = await login(userType, credentials);
-    return success;
+  };
+
+  const handleLogin = async (credentials: { identifier: string; password: string }) => {
+    const identifier = String(credentials?.identifier || '').trim();
+    const password = String(credentials?.password || '').trim();
+    const adminEmail = 'admin@o2.cz';
+
+    if (!identifier || !password) {
+      return false;
+    }
+
+    // 1) Admin login (single predefined account)
+    if (identifier.toLowerCase() === adminEmail) {
+      const isAdmin = await login('admin', { email: identifier, password });
+      if (isAdmin) return true;
+    }
+
+    // 2) Booth login (custom booth credentials)
+    const isBooth = await login('booth', { login: identifier, password });
+    if (isBooth) return true;
+
+    // 3) Participant login via LDAP (if configured)
+    const isParticipantViaLdap = await loginParticipantViaLdap(identifier, password);
+    if (isParticipantViaLdap) return true;
+
+    // 4) Participant login via current local flow (fallback)
+    const loggedInUser = await loginParticipant(identifier, password);
+    if (loggedInUser) {
+      setParticipantSession(identifier, {
+        firstName: loggedInUser.firstName,
+        lastName: loggedInUser.lastName,
+        position: loggedInUser.position,
+      });
+      return true;
+    }
+
+    return false;
   };
 
   if (isLoading) {
@@ -108,7 +121,7 @@ const Index = () => {
         <div className="relative overflow-hidden md:hidden h-96">
           <img
             src={heroImage}
-            alt="O2 Guru Summit 2025"
+            alt="O2 Guru Summit"
             className="w-full h-full object-cover object-bottom"
           />
           <div className="absolute inset-0 flex items-center justify-center px-4 py-24">
@@ -124,7 +137,7 @@ const Index = () => {
         <div className="relative overflow-hidden hidden md:block h-[70vh]">
           <img
             src={heroImage}
-            alt="O2 Guru Summit 2025"
+            alt="O2 Guru Summit"
             className="w-full h-full object-cover object-[50%_100%]"
           />
           <div className="absolute inset-0 flex items-center justify-center px-6">

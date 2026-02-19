@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
+import { BACKEND_MODE } from '@/lib/backendConfig';
+import { mysqlApiLogin } from '@/lib/api/mysqlAuthApi';
 
 interface StoredUser {
   personalNumber: string;
@@ -63,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const storedUser = localStorage.getItem('authUser');
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
-          if (parsedUser && (parsedUser.type === 'participant' || parsedUser.type === 'booth')) {
+          if (parsedUser && (parsedUser.type === 'participant' || parsedUser.type === 'booth' || parsedUser.type === 'admin')) {
             setUser(parsedUser);
             // Store in window for DataContext access
             (window as any).__authUser = parsedUser;
@@ -74,6 +76,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error('Error parsing stored user:', error);
         localStorage.removeItem('authUser');
+      }
+
+      if (BACKEND_MODE === 'mysql_api') {
+        setUserWithLogging(null);
+        setIsLoading(false);
+        return;
       }
       
       // Then check Supabase session for admin/booth users
@@ -119,6 +127,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const pn = String(credentials?.personalNumber ?? '').trim();
       const username = String(credentials?.login ?? credentials?.username ?? credentials?.email ?? pn).trim();
       const pwd = String(credentials?.password ?? '').trim();
+
+      if (BACKEND_MODE === 'mysql_api') {
+        const apiUser = await mysqlApiLogin(username, pwd);
+        if (!apiUser) return false;
+
+        const normalizedUser: User = {
+          id: String(apiUser.id),
+          personalNumber: String(apiUser.personalNumber || username),
+          type: apiUser.type,
+          firstName: apiUser.firstName,
+          lastName: apiUser.lastName,
+          position: apiUser.position,
+          boothId: apiUser.boothId,
+        };
+
+        setUserWithLogging(normalizedUser);
+        localStorage.setItem('authUser', JSON.stringify(normalizedUser));
+        (window as any).__authUser = normalizedUser;
+        return true;
+      }
 
       if (userType === 'admin') {
         // Allow only the designated admin account
@@ -242,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserWithLogging(null);
     // Clear localStorage for participant users
     localStorage.removeItem('authUser');
+    if (BACKEND_MODE === 'mysql_api') return;
     await supabase.auth.signOut();
   };
 
@@ -250,7 +279,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedUser = localStorage.getItem('authUser');
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
-        if (parsedUser && (parsedUser.type === 'participant' || parsedUser.type === 'booth')) {
+        if (parsedUser && (parsedUser.type === 'participant' || parsedUser.type === 'booth' || parsedUser.type === 'admin')) {
           if (import.meta.env.DEV) console.log('AuthContext: Setting user from storage:', parsedUser);
           setUserWithLogging(parsedUser);
           (window as any).__authUser = parsedUser;

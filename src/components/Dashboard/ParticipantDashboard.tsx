@@ -262,7 +262,7 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center">
                 <Smartphone className="h-6 w-6 text-primary mr-2" />
-                <h1 className="text-lg sm:text-xl font-bold text-primary">O2 Guru Summit 2025</h1>
+                <h1 className="text-lg sm:text-xl font-bold text-primary">O2 Guru Summit</h1>
               </div>
               <div className="flex items-center space-x-2 sm:space-x-4">
                 <Avatar className="h-8 w-8">

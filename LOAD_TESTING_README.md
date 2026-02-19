@@ -1,4 +1,4 @@
-# Load Testing Guide - O2 Guru Summit 2025
+# Load Testing Guide - O2 Guru Summit
 
 Tento průvodce vysvětluje, jak otestovat aplikaci pod zátěží 200 současných uživatelů.
 

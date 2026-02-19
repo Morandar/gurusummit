@@ -31,7 +31,7 @@ export const WinnersModal = ({ isOpen, onClose }: WinnersModalProps) => {
         <CardHeader className="text-center bg-gradient-primary text-white rounded-t-lg">
           <CardTitle className="flex items-center justify-center gap-2 text-2xl">
             <Trophy className="h-6 w-6" />
-            Vylosovaní výherci - O2 Guru Summit 2025
+            Vylosovaní výherci - O2 Guru Summit
           </CardTitle>
           <p className="text-white/90">
             Seznam všech vylosovaných výherců

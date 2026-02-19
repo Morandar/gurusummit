@@ -380,7 +380,7 @@ export const BoothDashboard = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Program dne</CardTitle>
-                <CardDescription>Harmonogram O2 Guru Summit 2025</CardDescription>
+                <CardDescription>Harmonogram O2 Guru Summit</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">

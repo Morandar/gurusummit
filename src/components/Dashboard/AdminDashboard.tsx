@@ -1146,7 +1146,7 @@ export const AdminDashboard = () => {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
-            <p className="text-muted-foreground">O2 Guru Summit 2025</p>
+            <p className="text-muted-foreground">O2 Guru Summit</p>
           </div>
           <Button variant="outline" onClick={logout}>
             <LogOut className="h-4 w-4 mr-2" />

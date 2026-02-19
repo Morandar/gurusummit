@@ -1,4 +1,4 @@
-# O2 Guru Summit 2025 - Gamified Hub
+# O2 Guru Summit - Gamified Hub
 
 ## Project info
 
@@ -62,7 +62,7 @@ This project is built with:
 - **React** - UI library with hooks
 - **shadcn-ui** - Modern UI components
 - **Tailwind CSS** - Utility-first CSS framework
-- **Supabase** - Backend as a service (database, auth, real-time)
+- **Supabase** - Current backend provider (with migration path to MySQL API)
 - **React Router** - Client-side routing
 - **React Query** - Data fetching and caching
 - **Capacitor** - Cross-platform mobile app development
@@ -102,6 +102,8 @@ Make sure to set the following environment variables in Vercel:
 
 - `VITE_SUPABASE_URL` - Your Supabase project URL
 - `VITE_SUPABASE_ANON_KEY` - Your Supabase anonymous key
+- `VITE_BACKEND_MODE` - `supabase` (default) or `mysql_api`
+- `VITE_MYSQL_API_BASE_URL` - Base URL of your MySQL backend API (used when `VITE_BACKEND_MODE=mysql_api`)
 
 ## Can I connect a custom domain?
 
@@ -121,5 +123,15 @@ Make sure to set the following environment variables in Vercel:
 
 - `VITE_SUPABASE_URL` - Your Supabase project URL
 - `VITE_SUPABASE_ANON_KEY` - Your Supabase anonymous key
+- `VITE_BACKEND_MODE` - `supabase` or `mysql_api`
+- `VITE_MYSQL_API_BASE_URL` - MySQL backend API base URL
+
+## MySQL migration
+
+Migration prep files are in `migration/mysql/`:
+
+- `migration/mysql/schema.mysql.sql` - MySQL 8 schema
+- `migration/mysql/README.md` - migration runbook and required API contract
+- `migration/mysql/frontend.env.example` - frontend env template for backend switch
 
 Read more in the [Vercel documentation](https://vercel.com/docs/concepts/projects/domains/add-a-domain)
