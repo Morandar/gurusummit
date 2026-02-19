@@ -28,6 +28,7 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
   const [finalScores, setFinalScores] = useState<Record<string, number>>({});
   const [finalVoteSubmitted, setFinalVoteSubmitted] = useState(false);
   const [finalVoteLoading, setFinalVoteLoading] = useState(false);
+  const [finalRankHint, setFinalRankHint] = useState('');
   
   // Get current user data from global state
   const currentUser = users.find(u => u.personalNumber === user.personalNumber);
@@ -45,6 +46,15 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
     if (!currentUser) return false;
     return finalTop10Users.some(u => String(u.personalNumber) === String(currentUser.personalNumber));
   }, [finalTop10Users, currentUser]);
+
+  const finalistNameByPersonalNumber = useMemo(() => {
+    const map: Record<string, string> = {};
+    finalTop10Users.forEach((u) => {
+      const key = String(u.personalNumber);
+      map[key] = `${u.firstName} ${u.lastName}`.trim();
+    });
+    return map;
+  }, [finalTop10Users]);
 
   useEffect(() => {
     const loadFinalVote = async () => {
@@ -71,15 +81,71 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
   }, [finalSettings, currentUser]);
 
   const handleFinalRankSelect = (personalNumber: string, rank: number) => {
-    setFinalScores(prev => {
+    setFinalScores((prev) => {
       const next = { ...prev };
-      // Ensure rank is unique: remove it from anyone else
-      Object.keys(next).forEach(key => {
-        if (next[key] === rank) {
-          delete next[key];
+      const moved: Array<{ personalNumber: string; from: number; to: number }> = [];
+
+      const findPersonByRank = (targetRank: number) =>
+        Object.keys(next).find((key) => next[key] === targetRank);
+
+      const oldRank = next[personalNumber];
+      if (oldRank === rank) {
+        setFinalRankHint('');
+        return prev;
+      }
+
+      if (typeof oldRank === 'number') {
+        delete next[personalNumber];
+      }
+
+      if (typeof oldRank === 'number' && oldRank < rank) {
+        // Move down in ranking: shift affected users up (e.g. 3->2, 4->3 ...)
+        for (let current = oldRank + 1; current <= rank; current++) {
+          const occupant = findPersonByRank(current);
+          if (occupant) {
+            next[occupant] = current - 1;
+            moved.push({ personalNumber: occupant, from: current, to: current - 1 });
+          }
         }
-      });
+      } else if (typeof oldRank === 'number' && oldRank > rank) {
+        // Move up in ranking: shift affected users down (e.g. 2->3, 3->4 ...)
+        for (let current = oldRank - 1; current >= rank; current--) {
+          const occupant = findPersonByRank(current);
+          if (occupant) {
+            next[occupant] = current + 1;
+            moved.push({ personalNumber: occupant, from: current, to: current + 1 });
+          }
+        }
+      } else {
+        // No previous rank: insert into target rank and push down until first free slot.
+        let freeRank = rank;
+        while (freeRank <= 10 && findPersonByRank(freeRank)) {
+          freeRank += 1;
+        }
+        for (let current = freeRank - 1; current >= rank; current--) {
+          const occupant = findPersonByRank(current);
+          if (occupant) {
+            next[occupant] = current + 1;
+            moved.push({ personalNumber: occupant, from: current, to: current + 1 });
+          }
+        }
+      }
+
       next[personalNumber] = rank;
+
+      if (moved.length > 0) {
+        const changed = moved
+          .map((item) => {
+            const name = finalistNameByPersonalNumber[item.personalNumber] || item.personalNumber;
+            return `${name} ${item.from}.->${item.to}.`;
+          })
+          .join(' ');
+        const selectedName = finalistNameByPersonalNumber[personalNumber] || personalNumber;
+        setFinalRankHint(`Nastaveno: ${selectedName} na ${rank}. místě. Posun: ${changed}`);
+      } else {
+        setFinalRankHint('');
+      }
+
       return next;
     });
   };
@@ -651,10 +717,15 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                     Finále TOP10
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Seřaďte TOP10 podle vašeho pořadí (1 = nejlepší, 10 = nejhorší). Každé číslo lze použít jen jednou.
+                    Seřaďte TOP10 podle vašeho pořadí (1 = nejlepší, 10 = nejhorší). Při výběru obsazeného místa se pořadí ostatních automaticky posune.
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {finalRankHint && (
+                    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+                      {finalRankHint}
+                    </div>
+                  )}
                   {finalTop10Users.length === 0 ? (
                     <p className="text-sm text-muted-foreground">TOP10 zatím není nastaveno.</p>
                   ) : isFinalist ? (
