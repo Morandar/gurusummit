@@ -396,7 +396,7 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                 {currentUser?.points ?? 0}
               </div>
               <p className="text-xs text-yellow-700 mt-1">
-                1 bod za návštěvu, 2 body za správnou odpověď
+                Body získáte pouze za správné odpovědi (1 bod za každou správnou odpověď)
               </p>
             </CardContent>
           </Card>

@@ -328,9 +328,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [banner, setBanner] = useState<Banner | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
 
-  const calculatePoints = (visitedBooths: number[], boothAnswers?: Record<number, 'pending' | 'correct' | 'wrong'>) => {
+  const calculatePoints = (_visitedBooths: number[], boothAnswers?: Record<number, 'pending' | 'correct' | 'wrong'>) => {
     const correctCount = Object.values(boothAnswers || {}).filter(status => status === 'correct').length;
-    return visitedBooths.length + correctCount * 2;
+    return correctCount;
   };
 
   // Registrace účastníka: hashování hesla a uložení do DB

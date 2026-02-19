@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { KeyRound, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -25,11 +24,12 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
   const [step, setStep] = useState<'code' | 'question'>('code');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
   const { toast } = useToast();
   const { booths, isCodeEntryAllowed, visitBooth, submitBoothAnswer } = useData();
-  const inputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
+  const isProcessingScanRef = useRef(false);
 
   const pickQuestion = (questions: BoothQuestion[]) => {
     if (questions.length === 0) return null;
@@ -97,6 +97,90 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
     setStep(visitStatus === 'pending' ? 'question' : 'code');
   }, [booths, boothId, isOpen, visitStatus, toast]);
 
+  const validateCode = (inputCode: string) => {
+    const booth = booths.find(b => b.id === boothId);
+    if (!booth) return false;
+    return inputCode.toUpperCase() === booth.code.toUpperCase();
+  };
+
+  const handleScannedCode = async (scannedCode: string) => {
+    if (isProcessingScanRef.current) return;
+    isProcessingScanRef.current = true;
+    setIsProcessingScan(true);
+    setCode(scannedCode);
+
+    if (!scannedCode.trim()) {
+      toast({
+        title: 'Chyba',
+        description: 'QR kód neobsahuje platný kód stánku.',
+        variant: 'destructive'
+      });
+      isProcessingScanRef.current = false;
+      setIsProcessingScan(false);
+      return;
+    }
+
+    if (!isCodeEntryAllowed()) {
+      toast({
+        title: 'Zadávání kódů není povoleno',
+        description: 'Zadávání kódů stánků je momentálně zakázáno.',
+        variant: 'destructive'
+      });
+      isProcessingScanRef.current = false;
+      setIsProcessingScan(false);
+      return;
+    }
+
+    if (validateCode(scannedCode)) {
+      const result = await visitBooth(userId, boothId);
+      if (result === 'answered') {
+        toast({
+          title: 'Již zodpovězeno',
+          description: 'Tento stánek už máte zodpovězený.',
+          variant: 'destructive'
+        });
+        onSuccess(boothId, result);
+        handleClose();
+        isProcessingScanRef.current = false;
+        setIsProcessingScan(false);
+        return;
+      }
+      if (result === 'error') {
+        isProcessingScanRef.current = false;
+        setIsProcessingScan(false);
+        return;
+      }
+      if (!currentQuestion) {
+        toast({
+          title: 'Chybí otázka',
+          description: 'Tento stánek nemá nastavené otázky. Kontaktujte obsluhu stánku.',
+          variant: 'destructive'
+        });
+        isProcessingScanRef.current = false;
+        setIsProcessingScan(false);
+        return;
+      }
+      toast({
+        title: 'QR ověřen',
+        description: 'Pokračujte na otázku.',
+      });
+      onSuccess(boothId, result);
+      setStep('question');
+      isProcessingScanRef.current = false;
+      setIsProcessingScan(false);
+      return;
+    }
+
+    toast({
+      title: 'Neplatný QR kód',
+      description: 'Naskenovaný kód nepatří tomuto stánku.',
+      variant: 'destructive'
+    });
+    setCode('');
+    isProcessingScanRef.current = false;
+    setIsProcessingScan(false);
+  };
+
   useEffect(() => {
     if (!scannerOpen) {
       if (scannerRef.current) {
@@ -114,8 +198,8 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
     const scanner = new QrScanner(
       videoEl,
       (result) => {
-        setCode(result.data || '');
         setScannerOpen(false);
+        void handleScannedCode(result.data || '');
       },
       {
         highlightScanRegion: true,
@@ -135,80 +219,6 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
       scannerRef.current = null;
     };
   }, [scannerOpen]);
-
-  const validateCode = (inputCode: string) => {
-    const booth = booths.find(b => b.id === boothId);
-    if (!booth) return false;
-    return inputCode.toUpperCase() === booth.code.toUpperCase();
-  };
-
-  const handleCodeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!code.trim()) {
-      toast({
-        title: 'Chyba',
-        description: 'Zadejte prosím kód stánku',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    if (!isCodeEntryAllowed()) {
-      toast({
-        title: 'Zadávání kódů není povoleno',
-        description: 'Zadávání kódů stánků je momentálně zakázáno.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    if (validateCode(code)) {
-      const result = await visitBooth(userId, boothId);
-      if (result === 'answered') {
-        toast({
-          title: 'Již zodpovězeno',
-          description: 'Tento stánek už máte zodpovězený.',
-          variant: 'destructive'
-        });
-        onSuccess(boothId, result);
-        handleClose();
-        return;
-      }
-      if (result === 'error') {
-        return;
-      }
-      if (!currentQuestion) {
-        toast({
-          title: 'Chybí otázka',
-          description: 'Tento stánek nemá nastavené otázky. Kontaktujte obsluhu stánku.',
-          variant: 'destructive'
-        });
-        return;
-      }
-      if (result === 'created') {
-        toast({
-          title: 'Kód ověřen',
-          description: 'Získali jste 1 bod. Pokračujte na otázku.',
-        });
-      } else {
-        toast({
-          title: 'Kód ověřen',
-          description: 'Pokračujte na otázku.',
-        });
-      }
-      onSuccess(boothId, result);
-      setStep('question');
-      return;
-    } else {
-      toast({
-        title: 'Neplatný kód',
-        description: 'Zadaný kód není správný. Zkuste to znovu.',
-        variant: 'destructive'
-      });
-      setCode('');
-      inputRef.current?.focus();
-    }
-  };
 
   const handleAnswerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,7 +245,7 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
     if (isCorrect) {
       toast({
         title: 'Správně! 🎉',
-        description: 'Získali jste 2 body za správnou odpověď.',
+        description: 'Získali jste 1 bod za správnou odpověď.',
       });
     } else {
       toast({
@@ -254,6 +264,8 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
     setStep('code');
     setScannerOpen(false);
     setScannerError(null);
+    setIsProcessingScan(false);
+    isProcessingScanRef.current = false;
     onClose();
   };
 
@@ -266,28 +278,18 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
             Návštěva stánku
           </DialogTitle>
           <DialogDescription>
-            Zadejte heslo pro stánek "{boothName}"
+            Načtěte QR kód pro stánek "{boothName}"
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 mt-4">
           {step === 'code' ? (
-            <form onSubmit={handleCodeSubmit} className="space-y-4">
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="code">Heslo stánku</Label>
-                <Input
-                  ref={inputRef}
-                  id="code"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="Zadejte heslo stánku..."
-                  maxLength={15}
-                  className="text-center text-lg font-mono tracking-wider"
-                  autoFocus
-                />
+                <Label>QR kód stánku</Label>
                 <div className="text-xs text-muted-foreground text-center space-y-1">
-                  <p>Heslo získáte od pracovníka stánku</p>
-                  <p className="text-green-600 font-semibold">✓ Funguje na všech zařízeních</p>
+                  <p>Otázka se odemkne pouze po úspěšném načtení QR kódu.</p>
+                  <p className="text-green-600 font-semibold">✓ Funguje na všech zařízeních s kamerou</p>
                 </div>
               </div>
 
@@ -296,9 +298,10 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
                   type="button"
                   variant="outline"
                   className="w-full"
+                  disabled={scannerOpen || isProcessingScan}
                   onClick={() => setScannerOpen(true)}
                 >
-                  Načíst QR kód
+                  {isProcessingScan ? 'Zpracovávám sken...' : 'Načíst QR kód'}
                 </Button>
                 {scannerError && (
                   <p className="text-xs text-destructive text-center">
@@ -323,25 +326,24 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
                 </div>
               )}
 
-              <div className="flex space-x-2">
+              {code && (
+                <p className="text-xs text-center text-muted-foreground">
+                  Načtený kód: <span className="font-mono">{code}</span>
+                </p>
+              )}
+
+              <div className="flex">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleClose}
-                  className="flex-1"
+                  className="w-full"
                 >
                   <X className="h-4 w-4 mr-2" />
                   Zrušit
                 </Button>
-                <Button
-                  type="submit"
-                  className="flex-1 bg-secondary hover:bg-secondary-hover"
-                  disabled={!code.trim()}
-                >
-                  Pokračovat
-                </Button>
               </div>
-            </form>
+            </div>
           ) : (
             <form onSubmit={handleAnswerSubmit} className="space-y-4">
               <div className="space-y-3">
