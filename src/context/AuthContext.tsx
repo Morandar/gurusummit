@@ -7,6 +7,7 @@ import { mysqlApiLogin } from '@/lib/api/mysqlAuthApi';
 const ADMIN_LOGIN_EMAIL = String(import.meta.env.VITE_ADMIN_EMAIL || 'admin@o2.cz')
   .trim()
   .toLowerCase();
+const ADMIN_TEST_PASSWORD = String(import.meta.env.VITE_ADMIN_TEST_PASSWORD || 'admin123').trim();
 
 interface StoredUser {
   personalNumber: string;
@@ -131,6 +132,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const pn = String(credentials?.personalNumber ?? '').trim();
       const username = String(credentials?.login ?? credentials?.username ?? credentials?.email ?? pn).trim();
       const pwd = String(credentials?.password ?? '').trim();
+
+      // Temporary fixed admin fallback for testing environments.
+      if (
+        userType === 'admin' &&
+        username.toLowerCase() === ADMIN_LOGIN_EMAIL &&
+        pwd === ADMIN_TEST_PASSWORD
+      ) {
+        const adminUser: User = { id: 'admin', personalNumber: ADMIN_LOGIN_EMAIL, type: 'admin' };
+        setUserWithLogging(adminUser);
+        localStorage.setItem('authUser', JSON.stringify(adminUser));
+        (window as any).__authUser = adminUser;
+        return true;
+      }
 
       if (BACKEND_MODE === 'mysql_api') {
         const apiUser = await mysqlApiLogin(username, pwd);
