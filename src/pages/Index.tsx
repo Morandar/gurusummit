@@ -9,6 +9,9 @@ import heroImage from '@/assets/hero-summit.jpg';
 const Index = () => {
   const { user, login, logout, setUserFromStorage, isLoading } = useAuth();
   const { homePageTexts, loginParticipant, isLoading: dataLoading } = useData();
+  const adminEmail = String(import.meta.env.VITE_ADMIN_EMAIL || 'admin@o2.cz')
+    .trim()
+    .toLowerCase();
 
   const setParticipantSession = (personalNumber: string, profile?: { firstName?: string; lastName?: string; position?: string }) => {
     const authUser = {
@@ -53,7 +56,6 @@ const Index = () => {
   const handleLogin = async (credentials: { identifier: string; password: string }) => {
     const identifier = String(credentials?.identifier || '').trim();
     const password = String(credentials?.password || '').trim();
-    const adminEmail = 'admin@o2.cz';
 
     if (!identifier || !password) {
       return false;

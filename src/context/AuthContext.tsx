@@ -4,6 +4,10 @@ import bcrypt from 'bcryptjs';
 import { BACKEND_MODE } from '@/lib/backendConfig';
 import { mysqlApiLogin } from '@/lib/api/mysqlAuthApi';
 
+const ADMIN_LOGIN_EMAIL = String(import.meta.env.VITE_ADMIN_EMAIL || 'admin@o2.cz')
+  .trim()
+  .toLowerCase();
+
 interface StoredUser {
   personalNumber: string;
   firstName?: string;
@@ -89,10 +93,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const session = data?.session;
       if (session && session.user) {
         // Rozlišení typu uživatele podle emailu (admin) nebo jiných údajů
-        if (session.user.email === 'admin@o2.cz') {
+        if (String(session.user.email || '').trim().toLowerCase() === ADMIN_LOGIN_EMAIL) {
           setUserWithLogging({
             id: 'admin',
-            personalNumber: session.user.email,
+            personalNumber: ADMIN_LOGIN_EMAIL,
             type: 'admin',
           });
         } else {
@@ -150,15 +154,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (userType === 'admin') {
         // Allow only the designated admin account
-        if (username !== 'admin@o2.cz') {
+        if (username.toLowerCase() !== ADMIN_LOGIN_EMAIL) {
           return false;
         }
         const { data, error } = await supabase.auth.signInWithPassword({
-          email: username,
+          email: ADMIN_LOGIN_EMAIL,
           password: pwd,
         });
         if (error || !data.session) return false;
-        setUserWithLogging({ id: 'admin', personalNumber: username, type: 'admin' });
+        setUserWithLogging({ id: 'admin', personalNumber: ADMIN_LOGIN_EMAIL, type: 'admin' });
         return true;
       }
 
