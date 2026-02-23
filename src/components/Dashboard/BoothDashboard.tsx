@@ -47,14 +47,20 @@ export const BoothDashboard = () => {
   const boothName: string = String((displayBooth as any)?.name || '').trim() || String((displayBooth as any)?.login || '').trim() || 'Stánek';
   const boothLogo: string | undefined = (displayBooth as any)?.logo;
   const visitors: number = Number((displayBooth as any)?.visits || 0);
+  const isUnlockBooth = (booth: any) => Boolean(booth?.isUnlockBooth ?? booth?.is_unlock_booth);
+  const isCurrentUnlockBooth = isUnlockBooth(displayBooth);
+  const competitionBooths = useMemo(
+    () => booths.filter((booth: any) => !isUnlockBooth(booth)),
+    [booths]
+  );
 
   const isMissingBooth = !isLoading && !displayBooth;
 
   const ranking = useMemo(() => {
-    if (!displayBooth || booths.length === 0) return 0;
+    if (!displayBooth || competitionBooths.length === 0 || isCurrentUnlockBooth) return 0;
     
     // Sort booths by visits in descending order
-    const sorted = [...booths].sort((a: any, b: any) => Number(b.visits || 0) - Number(a.visits || 0));
+    const sorted = [...competitionBooths].sort((a: any, b: any) => Number(b.visits || 0) - Number(a.visits || 0));
     
     // Find current booth's visits
     const currentBoothVisits = Number((displayBooth as any)?.visits || 0);
@@ -64,7 +70,7 @@ export const BoothDashboard = () => {
     
     // Ranking is 1-based, so add 1
     return boothsWithMoreVisits + 1;
-  }, [booths, displayBooth]);
+  }, [competitionBooths, displayBooth, isCurrentUnlockBooth]);
 
   const [timeToNext, setTimeToNext] = useState(0);
   const [nextEventName, setNextEventName] = useState('');
@@ -308,8 +314,12 @@ export const BoothDashboard = () => {
                   <CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-accent" /> Žebříček</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold mb-2">#{ranking || '-'}</div>
-                  <p className="text-sm text-muted-foreground">místo z {booths.length} stánků</p>
+                  <div className="text-3xl font-bold mb-2">{isCurrentUnlockBooth ? '—' : `#${ranking || '-'}`}</div>
+                  <p className="text-sm text-muted-foreground">
+                    {isCurrentUnlockBooth
+                      ? 'Vstupní stánek není součástí žebříčku.'
+                      : `místo z ${competitionBooths.length} stánků`}
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -321,8 +331,8 @@ export const BoothDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {booths.length > 0 ? (
-                    [...booths]
+                  {competitionBooths.length > 0 ? (
+                    [...competitionBooths]
                       .sort((a: any, b: any) => Number(b.visits || 0) - Number(a.visits || 0))
                       .map((booth: any, index: number) => (
                         <div
@@ -357,7 +367,7 @@ export const BoothDashboard = () => {
                         </div>
                       ))
                   ) : (
-                    <p className="text-center text-muted-foreground py-4">Žádné stánky nejsou zaregistrované</p>
+                    <p className="text-center text-muted-foreground py-4">Žádné soutěžní stánky nejsou zaregistrované</p>
                   )}
                 </div>
               </CardContent>
@@ -412,9 +422,17 @@ export const BoothDashboard = () => {
                               {item.time}
                             </Badge>
                           </div>
-                          <div className={`p-2 rounded-full ${categoryInfo.bgColor}`}>
-                            <CategoryIcon className={`h-4 w-4 ${categoryInfo.color}`} />
-                          </div>
+                          {item.image ? (
+                            <img
+                              src={item.image}
+                              alt={item.event}
+                              className="h-9 w-9 rounded-md object-cover border border-border bg-white"
+                            />
+                          ) : (
+                            <div className={`p-2 rounded-full ${categoryInfo.bgColor}`}>
+                              <CategoryIcon className={`h-4 w-4 ${categoryInfo.color}`} />
+                            </div>
+                          )}
                           <div className="flex-1">
                             <div className={`font-medium ${isPast ? 'line-through' : ''}`}>{item.event}</div>
                             <div className="text-sm text-muted-foreground">
