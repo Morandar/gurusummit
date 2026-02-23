@@ -126,15 +126,16 @@ export const ImageUploadModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md">
+    <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto p-4">
+      <div className="flex min-h-full items-start justify-center py-4 sm:items-center">
+      <Card className="w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Image className="h-5 w-5" />
             {title}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 overflow-y-auto">
           {/* Upload Area */}
           <div
             className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
@@ -258,7 +259,7 @@ export const ImageUploadModal = ({
           )}
 
           {/* Actions */}
-          <div className="flex gap-2 justify-end pt-4">
+          <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border -mx-6 px-6 pt-4 pb-1 flex gap-2 justify-end">
             <Button variant="outline" onClick={handleClose}>
               Zrušit
             </Button>
@@ -272,6 +273,7 @@ export const ImageUploadModal = ({
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };

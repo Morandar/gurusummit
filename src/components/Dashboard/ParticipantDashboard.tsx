@@ -33,14 +33,27 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
   // Get current user data from global state
   const currentUser = users.find(u => u.personalNumber === user.personalNumber);
   const visitedBooths = currentUser?.visitedBooths || [];
-  const progress = booths.length > 0 ? (visitedBooths.length / booths.length) * 100 : 0;
+  const isUnlockBooth = (booth: any) => Boolean((booth as any)?.isUnlockBooth ?? (booth as any)?.is_unlock_booth);
   const unlockBooths = useMemo(
-    () => booths.filter((booth) => Boolean((booth as any).isUnlockBooth ?? (booth as any).is_unlock_booth)),
+    () => booths.filter((booth) => isUnlockBooth(booth)),
     [booths]
   );
+  const competitionBooths = useMemo(
+    () => booths.filter((booth) => !isUnlockBooth(booth)),
+    [booths]
+  );
+  const competitionBoothIds = useMemo(
+    () => new Set(competitionBooths.map((booth) => booth.id)),
+    [competitionBooths]
+  );
+  const competitionVisitedCount = useMemo(
+    () => visitedBooths.filter((boothId) => competitionBoothIds.has(boothId)).length,
+    [visitedBooths, competitionBoothIds]
+  );
+  const progress = competitionBooths.length > 0 ? (competitionVisitedCount / competitionBooths.length) * 100 : 0;
   const hasUnlockBooth = unlockBooths.length > 0;
   const isBoothFlowUnlocked = !hasUnlockBooth || unlockBooths.some((booth) => visitedBooths.includes(booth.id));
-  const visibleBooths = isBoothFlowUnlocked ? booths : unlockBooths;
+  const visibleBooths = isBoothFlowUnlocked ? competitionBooths : unlockBooths;
 
   const finalTop10Users = useMemo(() => {
     const list = finalSettings?.top10PersonalNumbers || [];
@@ -469,10 +482,10 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
               <Trophy className="h-4 w-4 text-secondary" />
             </CardHeader>
             <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{visitedBooths.length}/{booths.length}</div>
+              <div className="text-xl sm:text-2xl font-bold">{competitionVisitedCount}/{competitionBooths.length}</div>
               <Progress value={progress} className="mt-2" />
               <p className="text-xs text-muted-foreground mt-2">
-                {progress.toFixed(0)}% stánků navštíveno
+                {progress.toFixed(0)}% soutěžních stánků navštíveno
               </p>
             </CardContent>
           </Card>

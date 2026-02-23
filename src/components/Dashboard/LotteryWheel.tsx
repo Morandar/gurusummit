@@ -20,9 +20,12 @@ export const LotteryWheel = ({ isOpen, onClose }: LotteryWheelProps) => {
 
   // Get users who completed minimum percentage and are not already winners
   const winnerUserIds = winners.map(w => w.userId);
+  const competitionBooths = booths.filter(booth => !(booth as any).isUnlockBooth && !(booth as any).is_unlock_booth);
+  const competitionBoothIds = new Set(competitionBooths.map(booth => booth.id));
   const eligibleUsers = users.filter(user => {
-    const requiredBooths = Math.ceil((lotterySettings.minimumPercentage / 100) * booths.length);
-    return user.visitedBooths.length >= requiredBooths && !winnerUserIds.includes(user.id);
+    const requiredBooths = Math.ceil((lotterySettings.minimumPercentage / 100) * competitionBooths.length);
+    const visitedCompetitionBooths = user.visitedBooths.filter(boothId => competitionBoothIds.has(boothId)).length;
+    return visitedCompetitionBooths >= requiredBooths && !winnerUserIds.includes(user.id);
   });
 
   const spinWheel = () => {

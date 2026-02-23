@@ -228,6 +228,18 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     return Math.min(100, Math.round((visitedCount / totalBooths) * 100));
   };
 
+  const isUnlockBooth = (booth: any) => Boolean(booth?.isUnlockBooth ?? booth?.is_unlock_booth);
+
+  const getCompetitionBoothIdSet = (boothList: any[]) =>
+    new Set(
+      (boothList || [])
+        .filter((booth: any) => !isUnlockBooth(booth))
+        .map((booth: any) => Number(booth.id))
+    );
+
+  const getCompetitionVisitedCount = (visitedBooths: number[], competitionBoothIds: Set<number>) =>
+    (visitedBooths || []).filter((boothId) => competitionBoothIds.has(Number(boothId))).length;
+
   const debugLog = (...args: any[]) => {
     if (import.meta.env.DEV) debugLog(...args);
   };
@@ -557,12 +569,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         console.warn('⚠️ DataContext: Could not fetch visit details:', visitsError);
       }
 
-      const boothCount = totalBooths || booths.length;
+      const competitionBoothIds = getCompetitionBoothIdSet(booths);
+      const boothCount = competitionBoothIds.size > 0 ? competitionBoothIds.size : (totalBooths || booths.length);
 
       const mappedUsers = usersData.map((user: any) => {
         const userBooths = visitsByUser.get(user.id) || new Set<number>();
         const visitedBooths = Array.from(userBooths);
-        const visitCount = visitedBooths.length;
+        const visitCount = getCompetitionVisitedCount(visitedBooths, competitionBoothIds);
         const boothAnswers = answersByUser.get(user.id) || {};
 
         return {
@@ -976,9 +989,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       return 'error';
     }
 
-    const unlockBooths = booths.filter((booth) => Boolean((booth as any).isUnlockBooth ?? (booth as any).is_unlock_booth));
-    const isTargetUnlockBooth = Boolean((targetBooth as any).isUnlockBooth ?? (targetBooth as any).is_unlock_booth);
+    const unlockBooths = booths.filter((booth) => isUnlockBooth(booth));
+    const isTargetUnlockBooth = isUnlockBooth(targetBooth);
     const isBoothFlowUnlocked = unlockBooths.length === 0 || unlockBooths.some((booth) => targetUser.visitedBooths.includes(booth.id));
+    const competitionBoothIds = getCompetitionBoothIdSet(booths);
+    const totalCompetitionBooths = competitionBoothIds.size;
     if (!isBoothFlowUnlocked && !isTargetUnlockBooth) {
       toast({
         title: 'Nejprve vstupní stánek',
@@ -1044,8 +1059,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           }
 
           const newVisitedBooths = [...user.visitedBooths, boothId];
-          const newProgress = calculateProgress(newVisitedBooths.length, booths.length);
-          debugLog(`📊 DataContext: Updated user progress: ${newProgress}% (${newVisitedBooths.length}/${booths.length})`);
+          const competitionVisitedCount = getCompetitionVisitedCount(newVisitedBooths, competitionBoothIds);
+          const newProgress = calculateProgress(competitionVisitedCount, totalCompetitionBooths);
+          debugLog(`📊 DataContext: Updated user progress: ${newProgress}% (${competitionVisitedCount}/${totalCompetitionBooths})`);
           const newAnswers = {
             ...(user.boothAnswers || {}),
             [boothId]: 'pending' as const
@@ -1054,7 +1070,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           const updatedUser = {
             ...user,
             visitedBooths: newVisitedBooths,
-            visits: user.visits + 1,
+            visits: competitionVisitedCount,
             progress: newProgress,
             boothAnswers: newAnswers,
             points: calculatePoints(newVisitedBooths, newAnswers)
@@ -1068,11 +1084,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       // Update progress in database to keep it in sync
       const newVisitedBooths = [...targetUser.visitedBooths, boothId];
-      const newProgress = calculateProgress(newVisitedBooths.length, booths.length);
+      const competitionVisitedCount = getCompetitionVisitedCount(newVisitedBooths, competitionBoothIds);
+      const newProgress = calculateProgress(competitionVisitedCount, totalCompetitionBooths);
       debugLog('💾 DataContext: Updating user progress in database...');
       await supabase
         .from('users')
-        .update({ progress: newProgress, visits: targetUser.visits + 1 })
+        .update({ progress: newProgress, visits: competitionVisitedCount })
         .eq('id', userId);
 
       // Update booth visit count in local state
@@ -1310,11 +1327,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
+    const competitionBoothIds = getCompetitionBoothIdSet(booths);
+    const totalCompetitionBooths = competitionBoothIds.size;
     setUsers(prev => prev.map(u => {
-      const prog = calculateProgress(u.visitedBooths.length, booths.length);
-      return { ...u, progress: prog };
+      const competitionVisitedCount = getCompetitionVisitedCount(u.visitedBooths, competitionBoothIds);
+      const prog = calculateProgress(competitionVisitedCount, totalCompetitionBooths);
+      return { ...u, visits: competitionVisitedCount, progress: prog };
     }));
-  }, [booths.length]);
+  }, [booths]);
 
   const createNotification = async (notification: Omit<Notification, 'id' | 'createdAt'>) => {
     try {
