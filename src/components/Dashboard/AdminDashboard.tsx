@@ -21,6 +21,13 @@ import { WinnersModal } from './WinnersModal';
 import { ImageUploadModal } from '@/components/Modals/ImageUploadModal';
 import { Switch } from '@/components/ui/switch';
 
+interface ImageLibraryItem {
+  id: string;
+  name: string;
+  url: string;
+  createdAt: string;
+}
+
 export const AdminDashboard = () => {
   const { logout } = useAuth();
   const {
@@ -34,7 +41,8 @@ export const AdminDashboard = () => {
   const [timeToNext, setTimeToNext] = useState(0);
   const [isLotteryOpen, setIsLotteryOpen] = useState(false);
   const [isWinnersOpen, setIsWinnersOpen] = useState(false);
-  const [imageUploadModal, setImageUploadModal] = useState<{ open: boolean; type: 'booth' | 'user'; id: number; title: string; currentImage?: string } | null>(null);
+  const [imageUploadModal, setImageUploadModal] = useState<{ open: boolean; type: 'booth' | 'user' | 'program' | 'library'; id: number; title: string; currentImage?: string } | null>(null);
+  const [imageLibrary, setImageLibrary] = useState<ImageLibraryItem[]>([]);
 
   // Dialog states
   const [editUserDialog, setEditUserDialog] = useState({ open: false, user: null });
@@ -55,9 +63,11 @@ export const AdminDashboard = () => {
     category: '',
     password: '',
     logo: '',
+    isUnlockBooth: false,
+    withoutQuestion: false,
     questions: [] as BoothQuestion[]
   });
-  const [eventForm, setEventForm] = useState({ time: '', event: '', duration: 30, category: 'lecture' });
+  const [eventForm, setEventForm] = useState({ time: '', event: '', duration: 30, category: 'lecture', image: '' });
   const [phoneForm, setPhoneForm] = useState({
     manufacturerName: '',
     phoneModel: '',
@@ -168,6 +178,18 @@ export const AdminDashboard = () => {
     }));
   };
 
+  const handleWithoutQuestionChange = (checked: boolean) => {
+    setBoothForm(prev => ({
+      ...prev,
+      withoutQuestion: checked,
+      questions: checked
+        ? []
+        : prev.questions.length > 0
+          ? prev.questions
+          : [createEmptyQuestion()]
+    }));
+  };
+
   // Calculate real-time stats
   const stats = {
     totalUsers: users.length,
@@ -217,6 +239,7 @@ export const AdminDashboard = () => {
   // Load all banners when component mounts
   useEffect(() => {
     loadAllBanners();
+    loadImageLibrary();
   }, []);
 
   const formatTime = (seconds: number) => {
@@ -540,6 +563,7 @@ export const AdminDashboard = () => {
   };
 
   const handleEditBooth = (booth: any) => {
+    const boothQuestions: BoothQuestion[] = Array.isArray(booth.questions) ? booth.questions : [];
     setBoothForm({ 
       name: booth.name, 
       code: booth.code, 
@@ -547,13 +571,15 @@ export const AdminDashboard = () => {
       category: booth.category || '',
       password: booth.password || '',
       logo: booth.logo || '',
-      questions: booth.questions && booth.questions.length > 0 ? booth.questions : [createEmptyQuestion()]
+      isUnlockBooth: Boolean(booth.isUnlockBooth ?? booth.is_unlock_booth),
+      withoutQuestion: boothQuestions.length === 0,
+      questions: boothQuestions
     });
     setEditBoothDialog({ open: true, booth });
   };
 
   const handleEditEvent = (event: any) => {
-    setEventForm({ time: event.time, event: event.event, duration: event.duration, category: event.category || 'lecture' });
+    setEventForm({ time: event.time, event: event.event, duration: event.duration, category: event.category || 'lecture', image: event.image || '' });
     setEditEventDialog({ open: true, event });
   };
 
@@ -608,7 +634,7 @@ export const AdminDashboard = () => {
 
   const handleSaveBooth = async () => {
     try {
-      if (boothForm.questions.length === 0) {
+      if (!boothForm.withoutQuestion && boothForm.questions.length === 0) {
         toast({
           title: 'Doplňte otázky',
           description: 'Každý stánek musí mít alespoň jednu otázku.',
@@ -617,7 +643,7 @@ export const AdminDashboard = () => {
         return;
       }
 
-      const hasInvalidQuestion = boothForm.questions.some(question =>
+      const hasInvalidQuestion = !boothForm.withoutQuestion && boothForm.questions.some(question =>
         !question.question.trim() ||
         !question.options.a.trim() ||
         !question.options.b.trim() ||
@@ -633,7 +659,16 @@ export const AdminDashboard = () => {
         return;
       }
 
-      const boothPayload = { ...boothForm };
+      const boothPayload = {
+        name: boothForm.name,
+        code: boothForm.code,
+        login: boothForm.login,
+        category: boothForm.category || '',
+        password: boothForm.password || '',
+        logo: boothForm.logo || '',
+        isUnlockBooth: Boolean(boothForm.isUnlockBooth),
+        questions: boothForm.withoutQuestion ? [] : boothForm.questions
+      };
       if (editBoothDialog.booth) {
         // Update existing booth in Supabase
         const { error } = await supabase
@@ -645,7 +680,8 @@ export const AdminDashboard = () => {
             category: boothPayload.category || null,
             password: boothPayload.password || null,
             logo: boothPayload.logo || null,
-            questions: boothPayload.questions
+            questions: boothPayload.questions,
+            is_unlock_booth: boothPayload.isUnlockBooth
           })
           .eq('id', editBoothDialog.booth.id);
 
@@ -663,7 +699,20 @@ export const AdminDashboard = () => {
         toast({ title: 'Stánek upraven', description: 'Změny byly uloženy' });
       } else {
         // Create new booth
-        const { data, error } = await supabase.from('booths').insert([{ ...boothPayload, visits: 0 }]).select();
+        const { data, error } = await supabase
+          .from('booths')
+          .insert([{
+            name: boothPayload.name,
+            code: boothPayload.code,
+            login: boothPayload.login,
+            category: boothPayload.category || null,
+            password: boothPayload.password || null,
+            logo: boothPayload.logo || null,
+            questions: boothPayload.questions,
+            is_unlock_booth: boothPayload.isUnlockBooth,
+            visits: 0
+          }])
+          .select();
         if (error) {
           toast({ title: 'Chyba při vytváření stánku', description: error.message });
           return;
@@ -678,7 +727,7 @@ export const AdminDashboard = () => {
       
       setEditBoothDialog({ open: false, booth: null });
       setAddBoothDialog(false);
-      setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [] });
+      setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', isUnlockBooth: false, withoutQuestion: false, questions: [] });
     } catch (error) {
       console.error('Save booth error:', error);
       toast({ title: 'Chyba při ukládání stánku', description: 'Nastala neočekávaná chyba' });
@@ -695,7 +744,8 @@ export const AdminDashboard = () => {
             time: eventForm.time,
             event: eventForm.event,
             duration: eventForm.duration,
-            category: eventForm.category
+            category: eventForm.category,
+            image: eventForm.image || null
           })
           .eq('id', editEventDialog.event.id);
 
@@ -723,7 +773,8 @@ export const AdminDashboard = () => {
             time: eventForm.time,
             event: eventForm.event,
             duration: eventForm.duration,
-            category: eventForm.category
+            category: eventForm.category,
+            image: eventForm.image || null
           }])
           .select();
 
@@ -738,7 +789,8 @@ export const AdminDashboard = () => {
             id: data[0].id,
             time: data[0].time,
             event: data[0].event,
-            duration: data[0].duration
+            duration: data[0].duration,
+            image: data[0].image || null
           }].sort((a, b) =>
             a.time.localeCompare(b.time)
           ));
@@ -748,7 +800,7 @@ export const AdminDashboard = () => {
 
       setEditEventDialog({ open: false, event: null });
       setAddEventDialog(false);
-      setEventForm({ time: '', event: '', duration: 30, category: 'lecture' });
+      setEventForm({ time: '', event: '', duration: 30, category: 'lecture', image: '' });
     } catch (error) {
       console.error('Save event error:', error);
       toast({ title: 'Chyba při ukládání události', description: 'Nastala neočekávaná chyba' });
@@ -894,7 +946,9 @@ export const AdminDashboard = () => {
 
   const handleImageUpload = async (imageUrl: string) => {
     try {
-      if (imageUploadModal?.type === 'booth') {
+      if (imageUploadModal?.type === 'library') {
+        await handleSaveImageToLibrary(imageUrl);
+      } else if (imageUploadModal?.type === 'booth') {
         // Update booth logo in Supabase
         const { error } = await supabase
           .from('booths')
@@ -932,6 +986,24 @@ export const AdminDashboard = () => {
             : user
         ));
         toast({ title: 'Profilový obrázek nahrán', description: 'Profilový obrázek byl úspěšně nahrán' });
+      } else if (imageUploadModal?.type === 'program') {
+        // Update program event image in Supabase
+        const { error } = await supabase
+          .from('program')
+          .update({ image: imageUrl })
+          .eq('id', imageUploadModal.id);
+
+        if (error) {
+          toast({ title: 'Chyba při nahrávání obrázku', description: error.message });
+          return;
+        }
+
+        setProgram(prev => prev.map(item =>
+          item.id === imageUploadModal.id
+            ? { ...item, image: imageUrl }
+            : item
+        ));
+        toast({ title: 'Obrázek události nahrán', description: 'Obrázek byl úspěšně uložen' });
       }
       
       setImageUploadModal(null);
@@ -1094,6 +1166,123 @@ export const AdminDashboard = () => {
     } catch (error) {
       console.error('❌ AdminDashboard: Error loading all banners:', error);
       toast({ title: 'Chyba při načítání bannerů', description: 'Nastala neočekávaná chyba' });
+    }
+  };
+
+  const normalizeImageLibrary = (rawValue: any): ImageLibraryItem[] => {
+    const source = Array.isArray(rawValue) ? rawValue : [];
+    return source
+      .map((item: any, index: number) => ({
+        id: String(item?.id || `image-${index + 1}`),
+        name: String(item?.name || '').trim() || 'Bez názvu',
+        url: String(item?.url || '').trim(),
+        createdAt: String(item?.createdAt || new Date().toISOString())
+      }))
+      .filter((item: ImageLibraryItem) => item.url.length > 0);
+  };
+
+  const loadImageLibrary = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'imageLibrary')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error loading image library:', error);
+        return;
+      }
+
+      const rawValue = data?.value;
+      const parsedValue =
+        typeof rawValue === 'string'
+          ? (() => {
+              try {
+                return JSON.parse(rawValue);
+              } catch {
+                return [];
+              }
+            })()
+          : rawValue;
+
+      setImageLibrary(normalizeImageLibrary(parsedValue));
+    } catch (error) {
+      console.error('Unexpected error loading image library:', error);
+    }
+  };
+
+  const persistImageLibrary = async (nextLibrary: ImageLibraryItem[]) => {
+    const { error } = await supabase
+      .from('settings')
+      .upsert(
+        [{
+          key: 'imageLibrary',
+          value: JSON.stringify(nextLibrary)
+        }],
+        { onConflict: 'key' }
+      );
+
+    if (error) {
+      throw error;
+    }
+
+    setImageLibrary(nextLibrary);
+  };
+
+  const handleSaveImageToLibrary = async (imageUrl: string, imageName?: string) => {
+    const normalizedUrl = String(imageUrl || '').trim();
+    if (!normalizedUrl) return;
+
+    const existingByUrl = imageLibrary.find(item => item.url === normalizedUrl);
+    if (existingByUrl) {
+      toast({
+        title: 'Obrázek už v bance je',
+        description: 'Stejný obrázek už je uložený v bance.'
+      });
+      return;
+    }
+
+    const newItem: ImageLibraryItem = {
+      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`,
+      name: String(imageName || '').trim() || `Obrázek ${imageLibrary.length + 1}`,
+      url: normalizedUrl,
+      createdAt: new Date().toISOString()
+    };
+
+    const nextLibrary = [newItem, ...imageLibrary];
+
+    try {
+      await persistImageLibrary(nextLibrary);
+      toast({
+        title: 'Uloženo do banky',
+        description: 'Obrázek byl přidán do banky obrázků.'
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Chyba při ukládání do banky',
+        description: error?.message || 'Nastala neočekávaná chyba',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleDeleteImageFromLibrary = async (imageId: string) => {
+    const nextLibrary = imageLibrary.filter(item => item.id !== imageId);
+    try {
+      await persistImageLibrary(nextLibrary);
+      toast({
+        title: 'Obrázek odstraněn',
+        description: 'Obrázek byl odstraněn z banky.'
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Chyba při mazání z banky',
+        description: error?.message || 'Nastala neočekávaná chyba',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -1582,7 +1771,7 @@ export const AdminDashboard = () => {
                   Export CSV
                 </Button>
                 <Button onClick={() => {
-                  setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [createEmptyQuestion()] });
+                  setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', isUnlockBooth: false, withoutQuestion: false, questions: [createEmptyQuestion()] });
                   setAddBoothDialog(true);
                 }}>
                   <Plus className="h-4 w-4 mr-2" />
@@ -1648,6 +1837,20 @@ export const AdminDashboard = () => {
                         <span className="text-sm text-muted-foreground">Návštěvy:</span>
                         <Badge variant="secondary">{booth.visits}</Badge>
                       </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Režim:</span>
+                        <div className="flex items-center gap-1">
+                          {Boolean((booth as any).isUnlockBooth ?? (booth as any).is_unlock_booth) && (
+                            <Badge variant="default">Vstupní</Badge>
+                          )}
+                          {(!booth.questions || booth.questions.length === 0) && (
+                            <Badge variant="outline">Bez otázky</Badge>
+                          )}
+                          {Boolean((booth as any).isUnlockBooth ?? (booth as any).is_unlock_booth) === false && booth.questions && booth.questions.length > 0 && (
+                            <Badge variant="secondary">Standard</Badge>
+                          )}
+                        </div>
+                      </div>
                       <div className="pt-2 space-x-2">
                         <Button variant="outline" size="sm" onClick={() => handleEditBooth(booth)}>
                           <Edit className="h-4 w-4 mr-1" />
@@ -1687,7 +1890,10 @@ export const AdminDashboard = () => {
           <TabsContent value="program" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold">Správa programu</h3>
-              <Button onClick={() => setAddEventDialog(true)}>
+              <Button onClick={() => {
+                setEventForm({ time: '', event: '', duration: 30, category: 'lecture', image: '' });
+                setAddEventDialog(true);
+              }}>
                 <Plus className="h-4 w-4 mr-2" />
                 Přidat událost
               </Button>
@@ -1728,9 +1934,17 @@ export const AdminDashboard = () => {
                           <Badge variant={isActive ? 'default' : isPast ? 'secondary' : 'outline'}>
                             {item.time}
                           </Badge>
-                          <div className={`p-2 rounded-full ${categoryInfo.bgColor}`}>
-                            <CategoryIcon className={`h-4 w-4 ${categoryInfo.color}`} />
-                          </div>
+                          {item.image ? (
+                            <img
+                              src={item.image}
+                              alt={item.event}
+                              className="h-10 w-10 rounded-md object-cover border border-border bg-white"
+                            />
+                          ) : (
+                            <div className={`p-2 rounded-full ${categoryInfo.bgColor}`}>
+                              <CategoryIcon className={`h-4 w-4 ${categoryInfo.color}`} />
+                            </div>
+                          )}
                           <div>
                             <div className={`font-medium ${isPast ? 'line-through text-muted-foreground' : ''}`}>
                               {item.event}
@@ -1748,6 +1962,20 @@ export const AdminDashboard = () => {
                           {isActive && (
                             <Badge className="bg-secondary">Probíhá</Badge>
                           )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setImageUploadModal({
+                              open: true,
+                              type: 'program',
+                              id: item.id,
+                              title: `Nahrát obrázek - ${item.event}`,
+                              currentImage: item.image
+                            })}
+                          >
+                            <Image className="h-4 w-4 mr-1" />
+                            {item.image ? 'Změnit obrázek' : 'Přidat obrázek'}
+                          </Button>
                           <Button variant="outline" size="sm" onClick={() => handleEditEvent(item)}>
                             <Edit className="h-4 w-4 mr-1" />
                             Upravit
@@ -2273,6 +2501,59 @@ export const AdminDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Banka obrázků</CardTitle>
+                  <CardDescription>
+                    Uložte si obrázky na jedno místo a pak je vybírejte u stánků i v programu.
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={() => setImageUploadModal({
+                    open: true,
+                    type: 'library',
+                    id: 0,
+                    title: 'Přidat obrázek do banky'
+                  })}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Přidat obrázek
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {imageLibrary.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Zatím tu nejsou žádné obrázky. Přidejte první obrázek do banky.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {imageLibrary.map((item) => (
+                      <div key={item.id} className="rounded-lg border border-border p-2 space-y-2">
+                        <img
+                          src={item.url}
+                          alt={item.name}
+                          className="h-24 w-full rounded object-cover bg-muted"
+                        />
+                        <p className="text-sm font-medium truncate" title={item.name}>{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(item.createdAt).toLocaleString('cs-CZ')}
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => handleDeleteImageFromLibrary(item.id)}
+                        >
+                          Odebrat z banky
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Actions Tab */}
@@ -2478,7 +2759,7 @@ export const AdminDashboard = () => {
           onOpenChange={(open) => {
             setEditBoothDialog({ open, booth: null });
             if (!open) {
-              setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [] });
+              setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', isUnlockBooth: false, withoutQuestion: false, questions: [] });
             }
           }}
         >
@@ -2526,69 +2807,97 @@ export const AdminDashboard = () => {
                   placeholder="Zadejte heslo pro stánek"
                 />
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Vstupní stánek</Label>
+                <div className="col-span-3 flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                  <span className="text-sm text-muted-foreground">Po načtení QR odemkne ostatní stánky</span>
+                  <Switch
+                    checked={boothForm.isUnlockBooth}
+                    onCheckedChange={(checked) => setBoothForm(prev => ({ ...prev, isUnlockBooth: checked }))}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Bez otázky</Label>
+                <div className="col-span-3 flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                  <span className="text-sm text-muted-foreground">Pouze ověření QR (bez odpovědi)</span>
+                  <Switch
+                    checked={boothForm.withoutQuestion}
+                    onCheckedChange={handleWithoutQuestionChange}
+                  />
+                </div>
+              </div>
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label className="text-right pt-2">Otázky</Label>
                 <div className="col-span-3 space-y-4">
-                  {boothForm.questions.map((question, index) => (
-                    <div key={`booth-question-${index}`} className="space-y-3 rounded-lg border border-border p-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold">Otázka {index + 1}</p>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeQuestion(index)}
-                          disabled={boothForm.questions.length === 1}
-                        >
-                          Odebrat
-                        </Button>
-                      </div>
-                      <Input
-                        value={question.question}
-                        onChange={(e) => updateQuestion(index, { question: e.target.value })}
-                        placeholder="Text otázky"
-                      />
-                      <div className="grid grid-cols-1 gap-2">
-                        <Input
-                          value={question.options.a}
-                          onChange={(e) => updateQuestionOption(index, 'a', e.target.value)}
-                          placeholder="Možnost A"
-                        />
-                        <Input
-                          value={question.options.b}
-                          onChange={(e) => updateQuestionOption(index, 'b', e.target.value)}
-                          placeholder="Možnost B"
-                        />
-                        <Input
-                          value={question.options.c}
-                          onChange={(e) => updateQuestionOption(index, 'c', e.target.value)}
-                          placeholder="Možnost C"
-                        />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label className="text-right">Správně</Label>
-                        <Select
-                          value={question.correct}
-                          onValueChange={(value: 'a' | 'b' | 'c') => updateQuestion(index, { correct: value })}
-                        >
-                          <SelectTrigger className="col-span-3">
-                            <SelectValue placeholder="Vyberte odpověď" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="a">a</SelectItem>
-                            <SelectItem value="b">b</SelectItem>
-                            <SelectItem value="c">c</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                  {boothForm.withoutQuestion ? (
+                    <div className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
+                      Tento stánek nebude mít otázku. Po načtení QR se návštěva pouze potvrdí.
                     </div>
-                  ))}
-                  <Button type="button" variant="outline" onClick={addQuestion}>
-                    Přidat otázku
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Účastník musí odpovědět správně na jednu náhodně vybranou otázku.
-                  </p>
+                  ) : (
+                    <>
+                      {boothForm.questions.map((question, index) => (
+                        <div key={`booth-question-${index}`} className="space-y-3 rounded-lg border border-border p-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold">Otázka {index + 1}</p>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeQuestion(index)}
+                              disabled={boothForm.questions.length === 1}
+                            >
+                              Odebrat
+                            </Button>
+                          </div>
+                          <Input
+                            value={question.question}
+                            onChange={(e) => updateQuestion(index, { question: e.target.value })}
+                            placeholder="Text otázky"
+                          />
+                          <div className="grid grid-cols-1 gap-2">
+                            <Input
+                              value={question.options.a}
+                              onChange={(e) => updateQuestionOption(index, 'a', e.target.value)}
+                              placeholder="Možnost A"
+                            />
+                            <Input
+                              value={question.options.b}
+                              onChange={(e) => updateQuestionOption(index, 'b', e.target.value)}
+                              placeholder="Možnost B"
+                            />
+                            <Input
+                              value={question.options.c}
+                              onChange={(e) => updateQuestionOption(index, 'c', e.target.value)}
+                              placeholder="Možnost C"
+                            />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <Label className="text-right">Správně</Label>
+                            <Select
+                              value={question.correct}
+                              onValueChange={(value: 'a' | 'b' | 'c') => updateQuestion(index, { correct: value })}
+                            >
+                              <SelectTrigger className="col-span-3">
+                                <SelectValue placeholder="Vyberte odpověď" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="a">a</SelectItem>
+                                <SelectItem value="b">b</SelectItem>
+                                <SelectItem value="c">c</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      ))}
+                      <Button type="button" variant="outline" onClick={addQuestion}>
+                        Přidat otázku
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Účastník musí odpovědět správně na jednu náhodně vybranou otázku.
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -2607,7 +2916,7 @@ export const AdminDashboard = () => {
           onOpenChange={(open) => {
             setAddBoothDialog(open);
             if (open) {
-              setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', questions: [createEmptyQuestion()] });
+              setBoothForm({ name: '', code: '', login: '', category: '', password: '', logo: '', isUnlockBooth: false, withoutQuestion: false, questions: [createEmptyQuestion()] });
             }
           }}
         >
@@ -2655,69 +2964,97 @@ export const AdminDashboard = () => {
                   placeholder="Zadejte heslo pro stánek"
                 />
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Vstupní stánek</Label>
+                <div className="col-span-3 flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                  <span className="text-sm text-muted-foreground">Po načtení QR odemkne ostatní stánky</span>
+                  <Switch
+                    checked={boothForm.isUnlockBooth}
+                    onCheckedChange={(checked) => setBoothForm(prev => ({ ...prev, isUnlockBooth: checked }))}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Bez otázky</Label>
+                <div className="col-span-3 flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                  <span className="text-sm text-muted-foreground">Pouze ověření QR (bez odpovědi)</span>
+                  <Switch
+                    checked={boothForm.withoutQuestion}
+                    onCheckedChange={handleWithoutQuestionChange}
+                  />
+                </div>
+              </div>
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label className="text-right pt-2">Otázky</Label>
                 <div className="col-span-3 space-y-4">
-                  {boothForm.questions.map((question, index) => (
-                    <div key={`add-booth-question-${index}`} className="space-y-3 rounded-lg border border-border p-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold">Otázka {index + 1}</p>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeQuestion(index)}
-                          disabled={boothForm.questions.length === 1}
-                        >
-                          Odebrat
-                        </Button>
-                      </div>
-                      <Input
-                        value={question.question}
-                        onChange={(e) => updateQuestion(index, { question: e.target.value })}
-                        placeholder="Text otázky"
-                      />
-                      <div className="grid grid-cols-1 gap-2">
-                        <Input
-                          value={question.options.a}
-                          onChange={(e) => updateQuestionOption(index, 'a', e.target.value)}
-                          placeholder="Možnost A"
-                        />
-                        <Input
-                          value={question.options.b}
-                          onChange={(e) => updateQuestionOption(index, 'b', e.target.value)}
-                          placeholder="Možnost B"
-                        />
-                        <Input
-                          value={question.options.c}
-                          onChange={(e) => updateQuestionOption(index, 'c', e.target.value)}
-                          placeholder="Možnost C"
-                        />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label className="text-right">Správně</Label>
-                        <Select
-                          value={question.correct}
-                          onValueChange={(value: 'a' | 'b' | 'c') => updateQuestion(index, { correct: value })}
-                        >
-                          <SelectTrigger className="col-span-3">
-                            <SelectValue placeholder="Vyberte odpověď" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="a">a</SelectItem>
-                            <SelectItem value="b">b</SelectItem>
-                            <SelectItem value="c">c</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                  {boothForm.withoutQuestion ? (
+                    <div className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
+                      Tento stánek nebude mít otázku. Po načtení QR se návštěva pouze potvrdí.
                     </div>
-                  ))}
-                  <Button type="button" variant="outline" onClick={addQuestion}>
-                    Přidat otázku
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Účastník musí odpovědět správně na jednu náhodně vybranou otázku.
-                  </p>
+                  ) : (
+                    <>
+                      {boothForm.questions.map((question, index) => (
+                        <div key={`add-booth-question-${index}`} className="space-y-3 rounded-lg border border-border p-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold">Otázka {index + 1}</p>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeQuestion(index)}
+                              disabled={boothForm.questions.length === 1}
+                            >
+                              Odebrat
+                            </Button>
+                          </div>
+                          <Input
+                            value={question.question}
+                            onChange={(e) => updateQuestion(index, { question: e.target.value })}
+                            placeholder="Text otázky"
+                          />
+                          <div className="grid grid-cols-1 gap-2">
+                            <Input
+                              value={question.options.a}
+                              onChange={(e) => updateQuestionOption(index, 'a', e.target.value)}
+                              placeholder="Možnost A"
+                            />
+                            <Input
+                              value={question.options.b}
+                              onChange={(e) => updateQuestionOption(index, 'b', e.target.value)}
+                              placeholder="Možnost B"
+                            />
+                            <Input
+                              value={question.options.c}
+                              onChange={(e) => updateQuestionOption(index, 'c', e.target.value)}
+                              placeholder="Možnost C"
+                            />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <Label className="text-right">Správně</Label>
+                            <Select
+                              value={question.correct}
+                              onValueChange={(value: 'a' | 'b' | 'c') => updateQuestion(index, { correct: value })}
+                            >
+                              <SelectTrigger className="col-span-3">
+                                <SelectValue placeholder="Vyberte odpověď" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="a">a</SelectItem>
+                                <SelectItem value="b">b</SelectItem>
+                                <SelectItem value="c">c</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      ))}
+                      <Button type="button" variant="outline" onClick={addQuestion}>
+                        Přidat otázku
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Účastník musí odpovědět správně na jednu náhodně vybranou otázku.
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -2785,6 +3122,16 @@ export const AdminDashboard = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="event-image" className="text-right">Obrázek</Label>
+                <Input
+                  id="event-image"
+                  value={eventForm.image}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, image: e.target.value }))}
+                  placeholder="URL nebo base64 obrázku"
+                  className="col-span-3"
+                />
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditEventDialog({ open: false, event: null })}>
@@ -2849,6 +3196,16 @@ export const AdminDashboard = () => {
                     <SelectItem value="ceremony">Ceremoniál</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="add-event-image" className="text-right">Obrázek</Label>
+                <Input
+                  id="add-event-image"
+                  value={eventForm.image}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, image: e.target.value }))}
+                  placeholder="URL nebo base64 obrázku"
+                  className="col-span-3"
+                />
               </div>
             </div>
             <DialogFooter>
@@ -3050,6 +3407,9 @@ export const AdminDashboard = () => {
           onImageSelect={handleImageUpload}
           title={imageUploadModal.title}
           currentImage={imageUploadModal.currentImage}
+          libraryImages={imageLibrary}
+          onSaveToLibrary={handleSaveImageToLibrary}
+          onDeleteFromLibrary={handleDeleteImageFromLibrary}
         />
       )}
 

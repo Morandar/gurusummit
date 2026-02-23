@@ -8,12 +8,12 @@ import heroImage from '@/assets/hero-summit.jpg';
 
 const Index = () => {
   const { user, login, logout, setUserFromStorage, isLoading } = useAuth();
-  const { homePageTexts, loginParticipant, isLoading: dataLoading } = useData();
+  const { homePageTexts, loginParticipant, markParticipantFirstLogin, isLoading: dataLoading } = useData();
   const adminEmail = String(import.meta.env.VITE_ADMIN_EMAIL || 'admin@o2.cz')
     .trim()
     .toLowerCase();
 
-  const setParticipantSession = (personalNumber: string, profile?: { firstName?: string; lastName?: string; position?: string }) => {
+  const setParticipantSession = async (personalNumber: string, profile?: { firstName?: string; lastName?: string; position?: string }) => {
     const authUser = {
       id: `participant-${personalNumber}`,
       personalNumber,
@@ -23,6 +23,7 @@ const Index = () => {
       position: profile?.position,
     };
     localStorage.setItem('authUser', JSON.stringify(authUser));
+    await markParticipantFirstLogin(personalNumber);
     setUserFromStorage();
   };
 
@@ -42,7 +43,7 @@ const Index = () => {
       if (!payload?.success) return false;
 
       const personalNumber = String(payload?.user?.personalNumber || identifier);
-      setParticipantSession(personalNumber, {
+      await setParticipantSession(personalNumber, {
         firstName: payload?.user?.firstName,
         lastName: payload?.user?.lastName,
         position: payload?.user?.position
@@ -78,7 +79,7 @@ const Index = () => {
     // 4) Participant login via current local flow (fallback)
     const loggedInUser = await loginParticipant(identifier, password);
     if (loggedInUser) {
-      setParticipantSession(identifier, {
+      await setParticipantSession(identifier, {
         firstName: loggedInUser.firstName,
         lastName: loggedInUser.lastName,
         position: loggedInUser.position,

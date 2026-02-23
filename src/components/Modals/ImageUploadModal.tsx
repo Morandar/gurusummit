@@ -1,9 +1,16 @@
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload, X, Image } from 'lucide-react';
+import { Image, Trash2, Upload, X } from 'lucide-react';
+
+interface ImageLibraryItem {
+  id: string;
+  name?: string;
+  url: string;
+  createdAt?: string;
+}
 
 interface ImageUploadModalProps {
   isOpen: boolean;
@@ -11,12 +18,33 @@ interface ImageUploadModalProps {
   onImageSelect: (imageUrl: string) => void;
   title: string;
   currentImage?: string;
+  libraryImages?: ImageLibraryItem[];
+  onSaveToLibrary?: (imageUrl: string, imageName?: string) => Promise<void> | void;
+  onDeleteFromLibrary?: (imageId: string) => Promise<void> | void;
 }
 
-export const ImageUploadModal = ({ isOpen, onClose, onImageSelect, title, currentImage }: ImageUploadModalProps) => {
+export const ImageUploadModal = ({
+  isOpen,
+  onClose,
+  onImageSelect,
+  title,
+  currentImage,
+  libraryImages = [],
+  onSaveToLibrary,
+  onDeleteFromLibrary
+}: ImageUploadModalProps) => {
   const [dragActive, setDragActive] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(currentImage || null);
+  const [libraryName, setLibraryName] = useState('');
+  const [libraryBusy, setLibraryBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setImagePreview(currentImage || null);
+      setLibraryName('');
+    }
+  }, [isOpen, currentImage]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -59,6 +87,27 @@ export const ImageUploadModal = ({ isOpen, onClose, onImageSelect, title, curren
     if (imagePreview) {
       onImageSelect(imagePreview);
       onClose();
+    }
+  };
+
+  const handleSaveToLibrary = async () => {
+    if (!imagePreview || !onSaveToLibrary) return;
+    setLibraryBusy(true);
+    try {
+      await onSaveToLibrary(imagePreview, libraryName.trim() || undefined);
+      setLibraryName('');
+    } finally {
+      setLibraryBusy(false);
+    }
+  };
+
+  const handleDeleteFromLibrary = async (imageId: string) => {
+    if (!onDeleteFromLibrary) return;
+    setLibraryBusy(true);
+    try {
+      await onDeleteFromLibrary(imageId);
+    } finally {
+      setLibraryBusy(false);
     }
   };
 
@@ -141,6 +190,72 @@ export const ImageUploadModal = ({ isOpen, onClose, onImageSelect, title, curren
               className="cursor-pointer"
             />
           </div>
+
+          {onSaveToLibrary && (
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <Label htmlFor="image-library-name">Uložit do banky obrázků</Label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input
+                  id="image-library-name"
+                  value={libraryName}
+                  onChange={(e) => setLibraryName(e.target.value)}
+                  placeholder="Název obrázku (volitelně)"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleSaveToLibrary}
+                  disabled={!imagePreview || libraryBusy}
+                >
+                  Uložit do banky
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {libraryImages.length > 0 && (
+            <div className="space-y-2">
+              <Label>Banka obrázků</Label>
+              <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                {libraryImages.map((image) => (
+                  <div key={image.id} className="rounded-md border border-border p-2 space-y-2">
+                    <img
+                      src={image.url}
+                      alt={image.name || 'Obrázek z banky'}
+                      className="h-20 w-full rounded object-cover bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground truncate" title={image.name || ''}>
+                      {image.name || 'Bez názvu'}
+                    </p>
+                    <div className="flex gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => {
+                          onImageSelect(image.url);
+                          onClose();
+                        }}
+                      >
+                        Použít
+                      </Button>
+                      {onDeleteFromLibrary && (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          onClick={() => handleDeleteFromLibrary(image.id)}
+                          disabled={libraryBusy}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-2 justify-end pt-4">

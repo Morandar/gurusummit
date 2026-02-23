@@ -9,6 +9,7 @@ interface User {
   firstName: string;
   lastName: string;
   position: string;
+  firstLoginAt?: string | null;
   visits: number;
   progress: number;
   visitedBooths: number[];
@@ -45,6 +46,7 @@ export interface Booth {
   code: string;
   login: string;
   visits: number;
+  isUnlockBooth?: boolean;
   category?: string;
   password?: string;
   logo?: string;
@@ -57,6 +59,7 @@ interface ProgramEvent {
   event: string;
   duration: number;
   category?: string;
+  image?: string;
 }
 
 interface CodeTimeSettings {
@@ -153,6 +156,7 @@ interface DataContextType {
   removeUserProfileImage: (userId: number) => void;
   registerParticipant: (userData: Omit<User, 'id' | 'progress' | 'visits' | 'visitedBooths' | 'password_hash'> & { password: string }) => Promise<boolean>;
   loginParticipant: (personalNumber: string, password: string) => Promise<User | null>;
+  markParticipantFirstLogin: (personalNumber: string) => Promise<void>;
   addUserByAdmin: (userData: { personalNumber: string; firstName: string; lastName: string; position: string; password?: string }) => Promise<boolean>;
   createNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => Promise<void>;
   markNotificationAsRead: (notificationId: number, userId: number) => Promise<void>;
@@ -302,6 +306,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           firstName: userData.firstName,
           lastName: userData.lastName,
           position: userData.position,
+          firstLoginAt: null,
           password_hash: password_hash,
           profileImage: null,
           visits: 0,
@@ -363,6 +368,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           firstName: userData.firstName,
           lastName: userData.lastName,
           position: userData.position,
+          firstLoginAt: null,
           password_hash: hash,
           profileImage: userData.profileImage || null,
           visits: 0,
@@ -398,6 +404,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       firstName: data.firstname,
       lastName: data.lastname,
       position: data.position,
+      firstLoginAt: data.first_login_at || null,
       visits: data.visits || 0,
       progress: data.progress || 0,
       visitedBooths: data.visitedbooths || [],
@@ -406,6 +413,44 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       profileImage: data.profileimage,
       password_hash: data.password_hash
     };
+  };
+
+  const markParticipantFirstLogin = async (personalNumber: string): Promise<void> => {
+    const normalizedPersonalNumber = String(personalNumber || '').trim();
+    if (!normalizedPersonalNumber) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, first_login_at, personalnumber')
+        .eq('personalnumber', normalizedPersonalNumber)
+        .maybeSingle();
+
+      if (error || !data || data.first_login_at) {
+        return;
+      }
+
+      const firstLoginAt = new Date().toISOString();
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ first_login_at: firstLoginAt })
+        .eq('id', data.id)
+        .is('first_login_at', null);
+
+      if (updateError) {
+        return;
+      }
+
+      setUsersState(prevUsers =>
+        prevUsers.map(user => {
+          if (String(user.personalNumber) !== normalizedPersonalNumber) return user;
+          if (user.firstLoginAt) return user;
+          return { ...user, firstLoginAt };
+        })
+      );
+    } catch {
+      // Intentionally ignore first-login tracking failures to avoid blocking sign-in.
+    }
   };
 
   // --- Local state setters (do not automatically sync to Supabase) ---
@@ -526,6 +571,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           firstName: user.firstname,
           lastName: user.lastname,
           position: user.position,
+          firstLoginAt: user.first_login_at || null,
           visits: visitCount,
           progress: calculateProgress(visitCount, boothCount),
           visitedBooths: visitedBooths, // Unique booth IDs visited by the user
@@ -591,6 +637,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       const boothsWithVisits = (boothsData || []).map((booth: any) => ({
         ...booth,
+        isUnlockBooth: Boolean(booth.is_unlock_booth ?? booth.isUnlockBooth),
         visits: visitCounts[booth.id] || 0
       }));
 
@@ -926,6 +973,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     if (!targetBooth) {
       console.error('❌ DataContext: Booth not found for visitBooth');
       toast({ title: 'Stánek nenalezen', description: 'Zkuste akci zopakovat.' });
+      return 'error';
+    }
+
+    const unlockBooths = booths.filter((booth) => Boolean((booth as any).isUnlockBooth ?? (booth as any).is_unlock_booth));
+    const isTargetUnlockBooth = Boolean((targetBooth as any).isUnlockBooth ?? (targetBooth as any).is_unlock_booth);
+    const isBoothFlowUnlocked = unlockBooths.length === 0 || unlockBooths.some((booth) => targetUser.visitedBooths.includes(booth.id));
+    if (!isBoothFlowUnlocked && !isTargetUnlockBooth) {
+      toast({
+        title: 'Nejprve vstupní stánek',
+        description: 'Nejprve načtěte QR kód vstupního stánku pro odemčení ostatních stánků.'
+      });
       return 'error';
     }
 
@@ -1495,6 +1553,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       removeUserProfileImage,
       registerParticipant,
       loginParticipant,
+      markParticipantFirstLogin,
       addUserByAdmin,
       createNotification,
       markNotificationAsRead,

@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     position TEXT NOT NULL,
     profileimage TEXT,
     password_hash TEXT,
+    first_login_at TIMESTAMP WITH TIME ZONE,
     visits INTEGER DEFAULT 0,
     progress INTEGER DEFAULT 0,
     visitedbooths INTEGER[] DEFAULT '{}',
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS public.booths (
     password TEXT,
     logo TEXT,
     category TEXT,
+    is_unlock_booth BOOLEAN DEFAULT FALSE,
     questions JSONB DEFAULT '[]'::jsonb,
     visits INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
@@ -40,6 +42,7 @@ CREATE TABLE IF NOT EXISTS public.program (
     event TEXT NOT NULL,
     duration INTEGER NOT NULL DEFAULT 30,
     category TEXT DEFAULT 'lecture',
+    image TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 

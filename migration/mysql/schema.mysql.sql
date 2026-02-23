@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   position VARCHAR(128) NOT NULL,
   profileimage TEXT NULL,
   password_hash VARCHAR(255) NULL,
+  first_login_at DATETIME(3) NULL,
   visits INT NOT NULL DEFAULT 0,
   progress INT NOT NULL DEFAULT 0,
   visitedbooths JSON NULL,
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS booths (
   password VARCHAR(255) NULL,
   logo TEXT NULL,
   category VARCHAR(128) NULL,
+  is_unlock_booth TINYINT(1) NOT NULL DEFAULT 0,
   questions JSON NOT NULL,
   visits INT NOT NULL DEFAULT 0,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -44,6 +46,7 @@ CREATE TABLE IF NOT EXISTS program (
   event VARCHAR(255) NOT NULL,
   duration INT NOT NULL DEFAULT 30,
   category VARCHAR(64) NOT NULL DEFAULT 'lecture',
+  image TEXT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id)
 ) ENGINE=InnoDB;

@@ -16,6 +16,7 @@ This project currently runs with Supabase SDK calls directly in frontend context
   - `src/lib/api/mysqlAuthApi.ts`
 - MySQL schema prepared:
   - `migration/mysql/schema.mysql.sql`
+  - includes `users.first_login_at`, `booths.is_unlock_booth`, `program.image`
 
 ## Backend API contract required for full migration
 

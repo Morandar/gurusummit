@@ -34,6 +34,13 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
   const currentUser = users.find(u => u.personalNumber === user.personalNumber);
   const visitedBooths = currentUser?.visitedBooths || [];
   const progress = booths.length > 0 ? (visitedBooths.length / booths.length) * 100 : 0;
+  const unlockBooths = useMemo(
+    () => booths.filter((booth) => Boolean((booth as any).isUnlockBooth ?? (booth as any).is_unlock_booth)),
+    [booths]
+  );
+  const hasUnlockBooth = unlockBooths.length > 0;
+  const isBoothFlowUnlocked = !hasUnlockBooth || unlockBooths.some((booth) => visitedBooths.includes(booth.id));
+  const visibleBooths = isBoothFlowUnlocked ? booths : unlockBooths;
 
   const finalTop10Users = useMemo(() => {
     const list = finalSettings?.top10PersonalNumbers || [];
@@ -288,6 +295,19 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
 
 
   const handleBoothVisit = (boothId: number, boothName: string) => {
+    const booth = booths.find(b => b.id === boothId);
+    if (!booth) return;
+
+    const isUnlockBooth = Boolean((booth as any).isUnlockBooth ?? (booth as any).is_unlock_booth);
+    if (!isBoothFlowUnlocked && !isUnlockBooth) {
+      return;
+    }
+
+    const isQuestionlessBooth = !booth.questions || booth.questions.length === 0;
+    if (isQuestionlessBooth && visitedBooths.includes(boothId)) {
+      return;
+    }
+
     const status = currentUser?.boothAnswers?.[boothId];
     if (status !== 'correct' && status !== 'wrong') {
       setSelectedBooth({ id: boothId, name: boothName });
@@ -381,9 +401,17 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
 
                       return (
                         <div key={event.id} className="flex items-center gap-3">
-                          <div className={`p-2 rounded-full ${categoryInfo.bgColor}`}>
-                            <CategoryIcon className={`h-4 w-4 ${categoryInfo.color}`} />
-                          </div>
+                          {event.image ? (
+                            <img
+                              src={event.image}
+                              alt={event.event}
+                              className="h-9 w-9 rounded-md object-cover border border-border bg-white"
+                            />
+                          ) : (
+                            <div className={`p-2 rounded-full ${categoryInfo.bgColor}`}>
+                              <CategoryIcon className={`h-4 w-4 ${categoryInfo.color}`} />
+                            </div>
+                          )}
                           <div className="flex-1">
                             <div className="font-semibold text-sm sm:text-base text-primary">
                               {event.event}
@@ -486,14 +514,24 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                   Stánky na summitu
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Klepněte na stánek a zadejte heslo pro získání bodů
+                  {isBoothFlowUnlocked
+                    ? 'Klepněte na stánek a načtěte QR kód'
+                    : 'Nejprve navštivte vstupní stánek pro odemčení všech stánků'}
                 </p>
               </CardHeader>
               <CardContent>
+                {!isBoothFlowUnlocked && unlockBooths[0] && (
+                  <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+                    Pro odemčení stánků nejprve načtěte QR kód na vstupním stánku:
+                    <span className="ml-1 font-semibold">{unlockBooths[0].name}</span>
+                  </div>
+                )}
                 <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                  {booths.map((booth) => {
+                  {visibleBooths.map((booth) => {
                     const isVisited = visitedBooths.includes(booth.id);
                     const status = currentUser?.boothAnswers?.[booth.id];
+                    const isUnlockBooth = Boolean((booth as any).isUnlockBooth ?? (booth as any).is_unlock_booth);
+                    const hasQuestions = Boolean(booth.questions && booth.questions.length > 0);
                     return (
                       <Card
                         key={booth.id}
@@ -521,7 +559,11 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                               <div className="flex items-start justify-between">
                                 <h3 className="font-medium text-sm sm:text-base leading-tight truncate">{booth.name}</h3>
                                 <div className="flex-shrink-0 ml-2">
-                                  {status === 'correct' ? (
+                                  {!hasQuestions && isVisited ? (
+                                    <Badge variant="secondary" className="text-xs">
+                                      ✓ VSTUP
+                                    </Badge>
+                                  ) : status === 'correct' ? (
                                     <Badge variant="secondary" className="text-xs">
                                       ✓ OK
                                     </Badge>
@@ -539,13 +581,18 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                                 </div>
                               </div>
                               <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                                {booth.category}
+                                {isUnlockBooth ? 'Vstupní stánek' : booth.category}
                               </p>
                             </div>
                           </div>
                           {!isVisited && (
                             <p className="text-xs text-primary font-medium">
-                              Klepněte pro zadání kódu
+                              {isUnlockBooth ? 'Klepněte pro ověření vstupu' : 'Klepněte pro zadání kódu'}
+                            </p>
+                          )}
+                          {!hasQuestions && isVisited && (
+                            <p className="text-xs text-muted-foreground font-medium">
+                              Vstup je potvrzen.
                             </p>
                           )}
                         </CardContent>
@@ -594,9 +641,17 @@ export const ParticipantDashboard = ({ user, onLogout, onUserUpdate }: Participa
                           <Badge variant={isActive ? 'default' : isPast ? 'secondary' : 'outline'}>
                             {item.time}
                           </Badge>
-                          <div className={`p-2 rounded-full ${categoryInfo.bgColor}`}>
-                            <CategoryIcon className={`h-4 w-4 ${categoryInfo.color}`} />
-                          </div>
+                          {item.image ? (
+                            <img
+                              src={item.image}
+                              alt={item.event}
+                              className="h-9 w-9 rounded-md object-cover border border-border bg-white"
+                            />
+                          ) : (
+                            <div className={`p-2 rounded-full ${categoryInfo.bgColor}`}>
+                              <CategoryIcon className={`h-4 w-4 ${categoryInfo.color}`} />
+                            </div>
+                          )}
                           <div>
                             <div className={`font-medium ${isPast ? 'line-through text-muted-foreground' : ''}`}>
                               {item.event}

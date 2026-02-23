@@ -30,6 +30,8 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
   const isProcessingScanRef = useRef(false);
+  const selectedBooth = booths.find(b => b.id === boothId);
+  const isQuestionlessBooth = !selectedBooth?.questions || selectedBooth.questions.length === 0;
 
   const pickQuestion = (questions: BoothQuestion[]) => {
     if (questions.length === 0) return null;
@@ -57,6 +59,7 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
     }
     const booth = booths.find(b => b.id === boothId);
     const questions = booth?.questions || [];
+    const hasQuestions = questions.length > 0;
     const fallbackUser = (window as any).__authUser as { personalNumber?: string; id?: string } | undefined;
     const userKey = fallbackUser?.personalNumber || fallbackUser?.id || 'anonymous';
     const storageKey = `booth-question-${userKey}-${boothId}`;
@@ -81,7 +84,7 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
       // ignore storage errors
     }
 
-    if (!chosen) {
+    if (!chosen && hasQuestions) {
       chosen = pickQuestion(questions);
       if (chosen) {
         try {
@@ -94,7 +97,7 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
 
     setCurrentQuestion(chosen);
     setSelectedAnswer('');
-    setStep(visitStatus === 'pending' ? 'question' : 'code');
+    setStep(visitStatus === 'pending' && hasQuestions ? 'question' : 'code');
   }, [booths, boothId, isOpen, visitStatus, toast]);
 
   const validateCode = (inputCode: string) => {
@@ -132,6 +135,8 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
     }
 
     if (validateCode(scannedCode)) {
+      const booth = booths.find(b => b.id === boothId);
+      const hasQuestions = Boolean(booth?.questions && booth.questions.length > 0);
       const result = await visitBooth(userId, boothId);
       if (result === 'answered') {
         toast({
@@ -146,6 +151,17 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
         return;
       }
       if (result === 'error') {
+        isProcessingScanRef.current = false;
+        setIsProcessingScan(false);
+        return;
+      }
+      if (!hasQuestions) {
+        toast({
+          title: result === 'pending' ? 'Vstup už potvrzen' : 'Vstup potvrzen',
+          description: 'Tento stánek je bez otázky. Návštěva byla zaznamenána.',
+        });
+        onSuccess(boothId, result);
+        handleClose();
         isProcessingScanRef.current = false;
         setIsProcessingScan(false);
         return;
@@ -275,10 +291,12 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="h-5 w-5 text-secondary" />
-            Návštěva stánku
+            {isQuestionlessBooth ? 'Ověření vstupu' : 'Návštěva stánku'}
           </DialogTitle>
           <DialogDescription>
-            Načtěte QR kód pro stánek "{boothName}"
+            {isQuestionlessBooth
+              ? `Načtěte QR kód pro vstupní stánek "${boothName}"`
+              : `Načtěte QR kód pro stánek "${boothName}"`}
           </DialogDescription>
         </DialogHeader>
 
@@ -286,9 +304,13 @@ export const BoothCodeModal = ({ isOpen, onClose, onSuccess, boothName, boothId,
           {step === 'code' ? (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>QR kód stánku</Label>
+                <Label>{isQuestionlessBooth ? 'QR kód vstupního stánku' : 'QR kód stánku'}</Label>
                 <div className="text-xs text-muted-foreground text-center space-y-1">
-                  <p>Otázka se odemkne pouze po úspěšném načtení QR kódu.</p>
+                  <p>
+                    {isQuestionlessBooth
+                      ? 'Po načtení bude vstup okamžitě potvrzen.'
+                      : 'Otázka se odemkne pouze po úspěšném načtení QR kódu.'}
+                  </p>
                   <p className="text-green-600 font-semibold">✓ Funguje na všech zařízeních s kamerou</p>
                 </div>
               </div>
